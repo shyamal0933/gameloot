@@ -66,7 +66,7 @@
     async function getSignedUrl(path, expiresIn = 3600) {
         if (!path) return null;
         try {
-            const { data, error } = await supabase.storage.from('KYC_DOCS').createSignedUrl(path, expiresIn);
+            const { data, error } = await supabase.storage.from('kyc_docs').createSignedUrl(path, expiresIn);
             if (error) { console.error(`Signed URL error for ${path}:`, error); return null; }
             return data.signedUrl;
         } catch(e) { console.error(e); return null; }
@@ -116,7 +116,7 @@
             <td>${t.title}</td><td>₹${t.reward}</td><td>${t.category}</td>
             <td><a href="${t.link}" target="_blank">Link</a></td>
             <td><button class="btn-sm deleteTask" data-id="${t.id}">Delete</button></td>
-        </tr>`).join('') || '<tr><td colspan="5">No tasks</td></td>'}
+        </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
         </tbody></table>`;
     }
 
@@ -125,8 +125,11 @@
         return `<h2 class="section-title">Pending Submissions</h2>
         <table><thead><tr><th>User</th><th>Task</th><th>Proof</th><th>Reward</th><th>Action</th></tr></thead><tbody>
         ${subs?.map(s => `<tr>
-            <td>${s.profiles?.name}</td><td>${s.tasks?.title}</td><td>${s.proof?.slice(0,50)}</td><td>₹${s.reward}</td>
-            <td class="flex-btns"><button class="btn-sm btn-approve approveSub" data-id="${s.id}" data-uid="${s.uid}" data-reward="${s.reward}">Approve</button><button class="btn-sm btn-reject rejectSub" data-id="${s.id}">Reject</button></td>
+            <td>${s.profiles?.name}</td>
+            <td>${s.tasks?.title}</td>
+            <td>${s.proof?.slice(0,50)}</td>
+            <td class="flex-btns"><button class="btn-sm btn-approve approveSub" data-id="${s.id}" data-uid="${s.uid}" data-reward="${s.reward}">Approve</button>
+            <button class="btn-sm btn-reject rejectSub" data-id="${s.id}">Reject</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No pending submissions</td></tr>'}
         </tbody></table>`;
     }
@@ -182,8 +185,11 @@
         return `<h2 class="section-title">User Management</h2>
         <table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
         ${users?.map(u => `<tr>
-            <td>${u.name||u.email}<br><small>${u.id}</small></td><td>₹${u.balance||0}</td>
-            <td>${u.verification_status||'pending'}</td><td>${u.fraud_score||0}</td><td>${u.account_status||'active'}</td>
+            <td>${u.name||u.email}<br><small>${u.id}</small></td>
+            <td>₹${u.balance||0}</td>
+            <td>${u.verification_status||'pending'}</td>
+            <td>${u.fraud_score||0}</td>
+            <td>${u.account_status||'active'}</td>
             <td><button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
             <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button></td>
         </tr>`).join('')}
@@ -193,9 +199,12 @@
     async function renderWithdrawals(){
         const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Withdrawals</h2>
-        <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
+        <tr><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
         ${wd?.map(w => `<tr>
-            <td>${w.profiles?.name}</td><td>₹${w.amount}</td><td>${w.method}</td><td>${w.details}</td>
+            <td>${w.profiles?.name}</td>
+            <td>₹${w.amount}</td>
+            <td>${w.method}</td>
+            <td>${w.details}</td>
             <td><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
             <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
