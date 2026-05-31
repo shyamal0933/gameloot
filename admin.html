@@ -36,7 +36,8 @@
         .kyc-review-card{background:#0f172a;border-radius:24px;padding:1.2rem;margin-bottom:1.2rem;border:1px solid #2a3a5a;}
         .kyc-images-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:15px 0;}
         .kyc-image{background:#00000040;border-radius:16px;padding:8px;text-align:center;}
-        .kyc-image img{max-width:100%;max-height:120px;border-radius:12px;cursor:pointer;}
+        .kyc-image img{max-width:100%;max-height:120px;border-radius:12px;cursor:pointer;background:#000;object-fit:contain;}
+        .kyc-image a{color:#00f2fe;font-size:0.7rem;word-break:break-all;}
     </style>
 </head>
 <body>
@@ -60,6 +61,14 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5dnRsZmF0anRicHdlbXd0cW9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzM1NDcsImV4cCI6MjA5NTgwOTU0N30.v_cHWMwXIfUZzedCnh6B-KPCGEFjJbld1PvRuDXqKIQ";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let currentAdmin = null;
+
+    // Helper: generate signed URL for a storage path
+    async function getSignedUrl(path, expiresIn = 3600) {
+        if (!path) return null;
+        const { data, error } = await supabase.storage.from('kyc_docs').createSignedUrl(path, expiresIn);
+        if (error) { console.error("Signed URL error:", error); return null; }
+        return data.signedUrl;
+    }
 
     async function checkAdminAuth(){
         const { data: { user } } = await supabase.auth.getUser();
@@ -101,7 +110,10 @@
         const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
         return `<div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
         <table><thead><tr><th>Title</th><th>Reward</th><th>Category</th><th>Link</th><th>Actions</th></tr></thead><tbody>
-        ${tasks?.map(t => `<tr><td>${t.title}</td><td>₹${t.reward}</td><td>${t.category}</td><td><a href="${t.link}" target="_blank">Link</a></td><td><button class="btn-sm deleteTask" data-id="${t.id}">Delete</button></td></tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
+        ${tasks?.map(t => `<tr>
+            <td>${t.title}</td><td>₹${t.reward}</td><td>${t.category}</td><td><a href="${t.link}" target="_blank">Link</a></td>
+            <td><button class="btn-sm deleteTask" data-id="${t.id}">Delete</button></td>
+        </tr>`).join('') || '<td><td colspan="5">No tasks</td></tr>'}
         </tbody></table>`;
     }
 
@@ -109,7 +121,9 @@
         const { data: subs } = await supabase.from('submissions').select('*, tasks(title), profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Pending Submissions</h2>
         <table><thead><tr><th>User</th><th>Task</th><th>Proof</th><th>Reward</th><th>Action</th></tr></thead><tbody>
-        ${subs?.map(s => `<tr><td>${s.profiles?.name}</td><td>${s.tasks?.title}</td><td>${s.proof?.slice(0,50)}</td><td>₹${s.reward}</td><td class="flex-btns"><button class="btn-sm btn-approve approveSub" data-id="${s.id}" data-uid="${s.uid}" data-reward="${s.reward}">Approve</button><button class="btn-sm btn-reject rejectSub" data-id="${s.id}">Reject</button></td></tr>`).join('') || '<tr><td colspan="5">No pending submissions</td></tr>'}
+        ${subs?.map(s => `<tr>
+            <td>${s.profiles?.name}</td><td>${s.tasks?.title}</td><td>${s.proof?.slice(0,50)}</td><tr><td class="flex-btns"><button class="btn-sm btn-approve approveSub" data-id="${s.id}" data-uid="${s.uid}" data-reward="${s.reward}">Approve</button><button class="btn-sm btn-reject rejectSub" data-id="${s.id}">Reject</button></td>
+        </tr>`).join('') || '<tr><td colspan="5">No pending submissions</td></tr>'}
         </tbody></table>`;
     }
 
@@ -120,17 +134,37 @@
         for(const k of kycList){
             const {data:prof}=await supabase.from('profiles').select('name,email').eq('id',k.uid).single();
             const userName = prof?.name || prof?.email || k.uid;
-            html += `<div class="kyc-review-card"><h3>${userName}</h3><p><strong>Aadhaar:</strong> ${k.aadhaar_number || '-'}</p><p><strong>PAN:</strong> ${k.pan_number || '-'}</p><div class="kyc-images-grid">
-                ${k.aadhaar_front ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.aadhaar_front).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>Aadhaar Front</div>` : ''}
-                ${k.aadhaar_back ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.aadhaar_back).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>Aadhaar Back</div>` : ''}
-                ${k.aadhaar_front_selfie ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.aadhaar_front_selfie).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>Aadhaar Front Selfie</div>` : ''}
-                ${k.aadhaar_back_selfie ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.aadhaar_back_selfie).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>Aadhaar Back Selfie</div>` : ''}
-                ${k.pan_front_doc ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.pan_front_doc).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>PAN Front Doc</div>` : ''}
-                ${k.pan_back_doc ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.pan_back_doc).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>PAN Back Doc</div>` : ''}
-                ${k.pan_front_selfie ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.pan_front_selfie).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>PAN Front Selfie</div>` : ''}
-                ${k.pan_back_selfie ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.pan_back_selfie).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>PAN Back Selfie</div>` : ''}
-                ${k.user_hd_pic ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.user_hd_pic).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>HD Profile Pic</div>` : ''}
-            </div><div class="flex-btns"><button class="btn-sm btn-approve verifyKyc" data-id="${k.id}" data-uid="${k.uid}">Approve KYC</button><button class="btn-sm btn-reject rejectKyc" data-id="${k.id}">Reject KYC</button></div></div>`;
+            // Generate signed URLs for each image
+            const aadFrontUrl = k.aadhaar_front ? await getSignedUrl(k.aadhaar_front) : null;
+            const aadBackUrl = k.aadhaar_back ? await getSignedUrl(k.aadhaar_back) : null;
+            const aadFrontSelfieUrl = k.aadhaar_front_selfie ? await getSignedUrl(k.aadhaar_front_selfie) : null;
+            const aadBackSelfieUrl = k.aadhaar_back_selfie ? await getSignedUrl(k.aadhaar_back_selfie) : null;
+            const panFrontDocUrl = k.pan_front_doc ? await getSignedUrl(k.pan_front_doc) : null;
+            const panBackDocUrl = k.pan_back_doc ? await getSignedUrl(k.pan_back_doc) : null;
+            const panFrontSelfieUrl = k.pan_front_selfie ? await getSignedUrl(k.pan_front_selfie) : null;
+            const panBackSelfieUrl = k.pan_back_selfie ? await getSignedUrl(k.pan_back_selfie) : null;
+            const hdPicUrl = k.user_hd_pic ? await getSignedUrl(k.user_hd_pic) : null;
+
+            html += `<div class="kyc-review-card">
+                <h3>${userName}</h3>
+                <p><strong>Aadhaar Number:</strong> ${k.aadhaar_number || '-'}</p>
+                <p><strong>PAN Number:</strong> ${k.pan_number || '-'}</p>
+                <div class="kyc-images-grid">
+                    ${aadFrontUrl ? `<div class="kyc-image"><img src="${aadFrontUrl}" onerror="this.src='https://placehold.co/150x100?text=Failed+to+load'"><br><a href="${aadFrontUrl}" target="_blank">Aadhaar Front</a></div>` : ''}
+                    ${aadBackUrl ? `<div class="kyc-image"><img src="${aadBackUrl}" onerror="this.src='https://placehold.co/150x100?text=Failed+to+load'"><br>Aadhaar Back</div>` : ''}
+                    ${aadFrontSelfieUrl ? `<div class="kyc-image"><img src="${aadFrontSelfieUrl}" onerror="this.src='https://placehold.co/150x100?text=Failed+to+load'"><br>Aadhaar Front Selfie</div>` : ''}
+                    ${aadBackSelfieUrl ? `<div class="kyc-image"><img src="${aadBackSelfieUrl}" onerror="this.src='https://placehold.co/150x100?text=Failed+to+load'"><br>Aadhaar Back Selfie</div>` : ''}
+                    ${panFrontDocUrl ? `<div class="kyc-image"><img src="${panFrontDocUrl}" onerror="this.src='https://placehold.co/150x100?text=Failed+to+load'"><br>PAN Front Doc</div>` : ''}
+                    ${panBackDocUrl ? `<div class="kyc-image"><img src="${panBackDocUrl}" onerror="this.src='https://placehold.co/150x100?text=Failed+to+load'"><br>PAN Back Doc</div>` : ''}
+                    ${panFrontSelfieUrl ? `<div class="kyc-image"><img src="${panFrontSelfieUrl}" onerror="this.src='https://placehold.co/150x100?text=Failed+to+load'"><br>PAN Front Selfie</div>` : ''}
+                    ${panBackSelfieUrl ? `<div class="kyc-image"><img src="${panBackSelfieUrl}" onerror="this.src='https://placehold.co/150x100?text=Failed+to+load'"><br>PAN Back Selfie</div>` : ''}
+                    ${hdPicUrl ? `<div class="kyc-image"><img src="${hdPicUrl}" onerror="this.src='https://placehold.co/150x100?text=Failed+to+load'"><br>HD Profile Pic</div>` : ''}
+                </div>
+                <div class="flex-btns">
+                    <button class="btn-sm btn-approve verifyKyc" data-id="${k.id}" data-uid="${k.uid}">Approve KYC</button>
+                    <button class="btn-sm btn-reject rejectKyc" data-id="${k.id}">Reject KYC</button>
+                </div>
+            </div>`;
         }
         return html;
     }
@@ -139,7 +173,11 @@
         const { data: users } = await supabase.from('profiles').select('*');
         return `<h2 class="section-title">User Management</h2>
         <table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-        ${users?.map(u => `<tr><td>${u.name||u.email}<br><small>${u.id}</small></td><td>₹${u.balance||0}</td><td>${u.verification_status||'pending'}</td><td>${u.fraud_score||0}</td><td>${u.account_status||'active'}</td><td><button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button><button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button></td></tr>`).join('')}
+        ${users?.map(u => `<tr>
+            <td>${u.name||u.email}<br><small>${u.id}</small></td><td>₹${u.balance||0}</td><td>${u.verification_status||'pending'}</td><td>${u.fraud_score||0}</td><td>${u.account_status||'active'}</td>
+            <td><button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
+            <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button></td>
+        </tr>`).join('')}
         </tbody></table>`;
     }
 
@@ -147,13 +185,24 @@
         const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Withdrawals</h2>
         <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
-        ${wd?.map(w => `<tr><td>${w.profiles?.name}</td><td>₹${w.amount}</td><td>${w.method}</td><td>${w.details}</td><td><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button><button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td></tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
+        ${wd?.map(w => `<tr>
+            <td>${w.profiles?.name}</td><td>₹${w.amount}</td><td>${w.method}</td><td>${w.details}</td>
+            <td><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
+            <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
+        </tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
         </tbody></table>`;
     }
 
     async function renderChat(){
         const { data: msgs } = await supabase.from('support_messages').select('*, profiles(name)').order('created_at');
-        return `<h2 class="section-title">Support Chat</h2><div id="chatMessages" style="height:300px; overflow-y:auto; background:#0f1222; border-radius:24px; padding:1rem;">${msgs?.map(m => `<div><strong>${m.profiles?.name||'User'}</strong> [${m.is_admin?'Admin':'User'}]: ${m.message}</div>`).join('')}</div><div style="margin-top:12px; display:flex;"><input type="text" id="adminChatMsg" placeholder="Reply as Admin..."><button id="sendAdminReply">Send</button></div>`;
+        return `<h2 class="section-title">Support Chat</h2>
+        <div id="chatMessages" style="height:300px; overflow-y:auto; background:#0f1222; border-radius:24px; padding:1rem;">
+            ${msgs?.map(m => `<div><strong>${m.profiles?.name||'User'}</strong> [${m.is_admin?'Admin':'User'}]: ${m.message}</div>`).join('')}
+        </div>
+        <div style="margin-top:12px; display:flex;">
+            <input type="text" id="adminChatMsg" placeholder="Reply as Admin...">
+            <button id="sendAdminReply">Send</button>
+        </div>`;
     }
 
     let activeTab = 'dashboard';
