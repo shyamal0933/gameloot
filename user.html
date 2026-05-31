@@ -136,7 +136,6 @@
         return `
         <h2 style="margin-bottom:1rem;"><i class="fas fa-id-card"></i> Complete KYC (Mandatory)</h2>
         <form id="kycModernForm">
-            <!-- AADHAAR SECTION -->
             <div class="kyc-card">
                 <div class="dropdown-header" data-dropdown="aadhaar">
                     <h3><i class="fas fa-id-card"></i> Aadhaar Verification</h3>
@@ -150,7 +149,6 @@
                     <div class="file-group"><label>Aadhaar Back Selfie (holding phone)</label><input type="file" id="aadBackSelfie" accept="image/*"><img id="previewAadBackSelfie" class="image-preview" style="display:none;"></div>
                 </div>
             </div>
-            <!-- PAN SECTION -->
             <div class="kyc-card">
                 <div class="dropdown-header" data-dropdown="pan">
                     <h3><i class="fas fa-credit-card"></i> PAN Card Verification</h3>
@@ -164,7 +162,6 @@
                     <div class="file-group"><label>PAN Back Selfie</label><input type="file" id="panBackSelfie" accept="image/*"><img id="previewPanBackSelfie" class="image-preview" style="display:none;"></div>
                 </div>
             </div>
-            <!-- HD PROFILE PICTURE -->
             <div class="kyc-card">
                 <h3><i class="fas fa-camera"></i> HD Profile Picture</h3>
                 <div class="file-group"><label>High Resolution Photo (clear face)</label><input type="file" id="hdProfilePic" accept="image/*"><img id="previewHd" class="image-preview" style="display:none;"></div>
@@ -173,17 +170,22 @@
         </form>`;
     }
 
-    async function uploadFile(file, path){
+    async function uploadFile(file, folder, filename){
         if(!file) return null;
-        const { data, error } = await supabase.storage.from('kyc_docs').upload(`${currentUser.id}/${path}`, file, { upsert: true });
-        if(error){ console.error(error); return null; }
-        return data.path;
+        const filePath = `${folder}/${filename}`;
+        const { data, error } = await supabase.storage.from('kyc_docs').upload(filePath, file, { upsert: true });
+        if(error){
+            console.error("Upload error:", error);
+            throw error;
+        }
+        return filePath; // return the full storage path
     }
 
     async function submitModernKyc(){
         const aadhaarNum = document.getElementById('aadhaarNum').value;
         const panNum = document.getElementById('panNum').value;
         if(!aadhaarNum || !panNum) return toast("Aadhaar and PAN numbers required","error");
+        
         const aadFrontDoc = document.getElementById('aadFrontDoc').files[0];
         const aadBackDoc = document.getElementById('aadBackDoc').files[0];
         const aadFrontSelfie = document.getElementById('aadFrontSelfie').files[0];
@@ -193,39 +195,52 @@
         const panFrontSelfie = document.getElementById('panFrontSelfie').files[0];
         const panBackSelfie = document.getElementById('panBackSelfie').files[0];
         const hdPic = document.getElementById('hdProfilePic').files[0];
+        
         if(!aadFrontDoc||!aadBackDoc||!aadFrontSelfie||!aadBackSelfie) return toast("All Aadhaar images required","error");
         if(!panFrontDoc||!panFrontSelfie) return toast("PAN front document and selfie required","error");
         if(!hdPic) return toast("HD profile picture required","error");
+        
         toast("Uploading documents...","info");
-        const aadFrontUrl = await uploadFile(aadFrontDoc, 'kyc/aad_front_doc');
-        const aadBackUrl = await uploadFile(aadBackDoc, 'kyc/aad_back_doc');
-        const aadFrontSelfieUrl = await uploadFile(aadFrontSelfie, 'kyc/aad_front_selfie');
-        const aadBackSelfieUrl = await uploadFile(aadBackSelfie, 'kyc/aad_back_selfie');
-        const panFrontUrl = await uploadFile(panFrontDoc, 'kyc/pan_front_doc');
-        const panBackUrl = panBackDoc ? await uploadFile(panBackDoc, 'kyc/pan_back_doc') : null;
-        const panFrontSelfieUrl = await uploadFile(panFrontSelfie, 'kyc/pan_front_selfie');
-        const panBackSelfieUrl = panBackSelfie ? await uploadFile(panBackSelfie, 'kyc/pan_back_selfie') : null;
-        const hdUrl = await uploadFile(hdPic, 'profile/hd.jpg');
-        const { error } = await supabase.from('verifications').insert({
-            uid: currentUser.id,
-            full_name: userProfile.name,
-            aadhaar_number: aadhaarNum,
-            aadhaar_front: aadFrontUrl,
-            aadhaar_back: aadBackUrl,
-            aadhaar_front_selfie: aadFrontSelfieUrl,
-            aadhaar_back_selfie: aadBackSelfieUrl,
-            pan_number: panNum,
-            pan_front_doc: panFrontUrl,
-            pan_back_doc: panBackUrl,
-            pan_front_selfie: panFrontSelfieUrl,
-            pan_back_selfie: panBackSelfieUrl,
-            user_hd_pic: hdUrl,
-            status: 'pending',
-            submitted_at: new Date()
-        });
-        if(error) return toast("Error: "+error.message,"error");
-        toast("KYC submitted successfully! Pending review.","success");
-        renderPanel('kyc');
+        
+        try {
+            const folder = `${currentUser.id}/kyc`;
+            const profileFolder = `${currentUser.id}/profile`;
+            
+            const aadFrontUrl = await uploadFile(aadFrontDoc, folder, 'aad_front_doc');
+            const aadBackUrl = await uploadFile(aadBackDoc, folder, 'aad_back_doc');
+            const aadFrontSelfieUrl = await uploadFile(aadFrontSelfie, folder, 'aad_front_selfie');
+            const aadBackSelfieUrl = await uploadFile(aadBackSelfie, folder, 'aad_back_selfie');
+            const panFrontUrl = await uploadFile(panFrontDoc, folder, 'pan_front_doc');
+            const panBackUrl = panBackDoc ? await uploadFile(panBackDoc, folder, 'pan_back_doc') : null;
+            const panFrontSelfieUrl = await uploadFile(panFrontSelfie, folder, 'pan_front_selfie');
+            const panBackSelfieUrl = panBackSelfie ? await uploadFile(panBackSelfie, folder, 'pan_back_selfie') : null;
+            const hdUrl = await uploadFile(hdPic, profileFolder, 'hd.jpg');
+            
+            const { error } = await supabase.from('verifications').insert({
+                uid: currentUser.id,
+                full_name: userProfile.name,
+                aadhaar_number: aadhaarNum,
+                aadhaar_front: aadFrontUrl,
+                aadhaar_back: aadBackUrl,
+                aadhaar_front_selfie: aadFrontSelfieUrl,
+                aadhaar_back_selfie: aadBackSelfieUrl,
+                pan_number: panNum,
+                pan_front_doc: panFrontUrl,
+                pan_back_doc: panBackUrl,
+                pan_front_selfie: panFrontSelfieUrl,
+                pan_back_selfie: panBackSelfieUrl,
+                user_hd_pic: hdUrl,
+                status: 'pending',
+                submitted_at: new Date()
+            });
+            if(error) throw error;
+            
+            toast("KYC submitted successfully! Pending review.","success");
+            renderPanel('kyc');
+        } catch(err) {
+            console.error(err);
+            toast("Upload failed: "+err.message,"error");
+        }
     }
 
     async function renderWithdraw(){
@@ -260,7 +275,7 @@
         document.getElementById('submitModernKyc')?.addEventListener('click',submitModernKyc);
         document.getElementById('wdForm')?.addEventListener('submit',async(e)=>{ e.preventDefault(); let amt=document.getElementById('wdAmount').value; if(amt<100) return toast("Min ₹100","error"); await supabase.from('withdrawals').insert({ uid:currentUser.id, amount:amt, method:document.getElementById('wdMethod').value, details:document.getElementById('wdDetails').value, status:'pending' }); toast("Request sent","success"); renderPanel('withdraw'); });
         document.getElementById('sendMsgBtn')?.addEventListener('click',async()=>{ let msg=document.getElementById('userChatMsg').value; if(msg){ await supabase.from('support_messages').insert({ uid:currentUser.id, message:msg, is_admin:false }); document.getElementById('userChatMsg').value=''; renderPanel('chat'); } });
-        // dropdowns
+        
         document.querySelectorAll('.dropdown-header').forEach(header=>{
             header.addEventListener('click',()=>{
                 const targetId = header.getAttribute('data-dropdown')+'Content';
@@ -271,7 +286,7 @@
                 else icon.classList.replace('fa-chevron-up','fa-chevron-down');
             });
         });
-        // previews
+        
         const setupPreview = (fileId, previewId) => {
             const inp = document.getElementById(fileId);
             if(inp) inp.addEventListener('change',(e)=>{
