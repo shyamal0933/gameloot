@@ -48,9 +48,10 @@
 </div>
 <script>
     (function() {
-        // === SUPABASE CONFIG (ONLY ONCE) ===
+        // ==================== YOUR SUPABASE CREDENTIALS ====================
         const SUPABASE_URL = "https://kyvtlfatjtbpwemwtqof.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5dnRsZmF0anRicHdlbXd0cW9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzM1NDcsImV4cCI6MjA5NTgwOTU0N30.v_cHWMwXIfUZzedCnh6B-KPCGEFjJbld1PvRuDXqKIQ";
+        // ====================================================================
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
         let currentUser = null;
@@ -60,6 +61,37 @@
             Swal.fire({ toast: true, position: 'top-end', icon, title: msg, showConfirmButton: false, timer: 3000 });
         }
         
+        async function ensureProfileExists(userId, email) {
+            // Check if profile exists
+            let { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
+            if (!profile) {
+                // Create profile with a unique referral code
+                const referralCode = 'GL' + Math.random().toString(36).substring(2,8).toUpperCase();
+                const newProfile = {
+                    id: userId,
+                    email: email,
+                    name: email.split('@')[0],
+                    balance: 0,
+                    verification_status: 'pending',
+                    referral_code: referralCode,
+                    total_referrals: 0,
+                    referral_earnings: 0,
+                    fraud_score: 0,
+                    account_status: 'active',
+                    is_admin: false,
+                    created_at: new Date()
+                };
+                const { error } = await supabase.from('profiles').insert(newProfile);
+                if (error) {
+                    console.error("Profile creation error:", error);
+                    toast("Error creating profile. Please contact support.", "error");
+                    return null;
+                }
+                profile = newProfile;
+            }
+            return profile;
+        }
+        
         async function checkAuthAndLoad() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
@@ -67,40 +99,24 @@
                 return;
             }
             currentUser = user;
+            // Wait for email verification
             if (!user.email_confirmed_at) {
                 await supabase.auth.signOut();
                 Swal.fire("Email Not Verified", "Please verify your email before accessing tasks.", "error");
                 showAuthModal();
                 return;
             }
-            await fetchUserProfile();
-            renderPanel('dashboard');
-        }
-        
-        async function fetchUserProfile() {
-            let { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-            if (!profile) {
-                const newProfile = {
-                    id: currentUser.id,
-                    email: currentUser.email,
-                    name: currentUser.email.split('@')[0],
-                    balance: 0,
-                    verification_status: 'pending',
-                    referral_code: 'GL' + Math.random().toString(36).substring(2,8).toUpperCase(),
-                    total_referrals: 0,
-                    referral_earnings: 0,
-                    fraud_score: 0,
-                    account_status: 'active'
-                };
-                await supabase.from('profiles').insert(newProfile);
-                profile = newProfile;
-            }
-            userProfile = profile;
+            // Ensure profile exists
+            userProfile = await ensureProfileExists(user.id, user.email);
+            if (!userProfile) return;
+            
+            // Handle referral from URL
             const refCode = new URLSearchParams(window.location.search).get('ref');
             if (refCode && !userProfile.referred_by) {
-                await supabase.from('profiles').update({ referred_by: refCode }).eq('id', currentUser.id);
+                await supabase.from('profiles').update({ referred_by: refCode }).eq('id', user.id);
                 toast("Referral code applied! Bonus after conditions.", "success");
             }
+            renderPanel('dashboard');
         }
         
         async function renderDashboard() {
@@ -163,7 +179,7 @@
         async function renderKyc() {
             const { data: existing } = await supabase.from('verifications').select('*').eq('uid', currentUser.id).single();
             if (existing?.status === 'verified') return `<h2>KYC Status</h2><div class="stat-card">✅ Verified! You can withdraw.</div>`;
-            if (existing?.status === 'pending') return `<h2>KYC Status</h2><div class="stat-card">⏳ Under review. We'll notify you soon.</div>`;
+            if (existing?.status === 'pending') return `<h2>KYC Status</h2><div class="stat-card">⏳ Under review.</div>`;
             return `
                 <h2>Complete KYC (Mandatory for Withdrawal)</h2>
                 <div style="max-width:500px">
@@ -181,7 +197,7 @@
         
         async function renderWithdraw() {
             if (userProfile.verification_status !== 'verified') {
-                return `<h2>Withdrawal Blocked</h2><div class="stat-card">⚠️ Complete Aadhaar, PAN & Selfie KYC first.</div>`;
+                return `<h2>Withdrawal Blocked</h2><div class="stat-card">⚠️ Complete KYC first.</div>`;
             }
             return `
                 <h2>Withdraw Funds</h2>
@@ -206,7 +222,7 @@
                     ${msgs?.map(m => `<div><strong>${m.is_admin ? 'Admin' : 'You'}:</strong> ${m.message}</div>`).join('')}
                 </div>
                 <div style="display:flex; gap:10px; margin-top:10px;">
-                    <input type="text" id="userChatMsg" placeholder="Type your message...">
+                    <input type="text" id="userChatMsg" placeholder="Type message...">
                     <button id="sendMsgBtn">Send</button>
                 </div>
             `;
@@ -317,10 +333,11 @@
             const selfie = document.getElementById('holdingSelfie').files[0];
             
             if (!fullName || !aadhaarNum || !panNum) return toast("Please fill all fields", "error");
-            if (!aadFront || !aadBack || !panFront || !selfie) return toast("Please upload all required images", "error");
+            if (!aadFront || !aadBack || !panFront || !selfie) return toast("Please upload all images", "error");
             
             const uploadFile = async (file, path) => {
-                const { data } = await supabase.storage.from('kyc_docs').upload(`${currentUser.id}/${path}`, file);
+                const { data, error } = await supabase.storage.from('kyc_docs').upload(`${currentUser.id}/${path}`, file);
+                if (error) throw error;
                 return data?.path;
             };
             
@@ -346,13 +363,13 @@
                 renderPanel('kyc');
             } catch (err) {
                 console.error(err);
-                toast("Upload failed. Make sure storage bucket 'kyc_docs' exists.", "error");
+                toast("Upload failed. Ensure storage bucket 'kyc_docs' exists.", "error");
             }
         }
         
         function showAuthModal() {
             Swal.fire({
-                title: 'Welcome to GameLoot',
+                title: 'GameLoot',
                 html: `
                     <input id="authEmail" placeholder="Email" class="swal2-input">
                     <input id="authPass" type="password" placeholder="Password" class="swal2-input">
@@ -373,7 +390,7 @@
                 if (mode === 'signup') {
                     const { error } = await supabase.auth.signUp({ email, password: pass });
                     if (error) toast(error.message, "error");
-                    else toast("Verification email sent! Check your inbox.", "info");
+                    else toast("Verification email sent! Check your inbox (and spam).", "info");
                 } else {
                     const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
                     if (error) toast(error.message, "error");
