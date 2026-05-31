@@ -148,7 +148,6 @@
         const { data: existing } = await supabase.from('verifications').select('*').eq('uid', currentUser.id).order('submitted_at', { ascending: false }).limit(1).maybeSingle();
         if(existing?.status === 'verified') return `<h2>KYC Status</h2><div class="stat-card">✅ Verified! You can withdraw.</div>`;
         if(existing?.status === 'pending') return `<h2>KYC Status</h2><div class="stat-card">⏳ Under review.</div>`;
-        // If rejected or no record, show form
         return `
         <h2 style="margin-bottom:1rem;"><i class="fas fa-id-card"></i> Complete KYC (Mandatory)</h2>
         <form id="kycModernForm">
@@ -260,8 +259,20 @@
     }
 
     async function renderChat(){
-        const { data: msgs } = await supabase.from('support_messages').select('*').or(`uid.eq.${currentUser.id},is_admin.eq.true`).order('created_at');
-        return `<h2>Support Chat</h2><div id="chatBox" style="height:250px; overflow-y:auto; background:#0f1222; border-radius:20px; padding:1rem;">${msgs?.map(m=>`<div><strong>${m.is_admin?'Admin':'You'}:</strong> ${m.message}</div>`).join('')}</div><div style="display:flex; gap:10px; margin-top:10px;"><input type="text" id="userChatMsg"><button id="sendMsgBtn">Send</button></div>`;
+        // Fetch only messages where user is sender or recipient
+        const { data: msgs } = await supabase
+            .from('support_messages')
+            .select('*')
+            .or(`uid.eq.${currentUser.id},recipient_uid.eq.${currentUser.id}`)
+            .order('created_at', { ascending: true });
+        return `<h2>Support Chat (Private)</h2>
+        <div id="chatBox" style="height:250px; overflow-y:auto; background:#0f1222; border-radius:20px; padding:1rem;">
+            ${msgs?.map(m => `<div><strong>${m.is_admin ? 'Admin' : 'You'}:</strong> ${m.message}</div>`).join('') || '<div>No messages yet.</div>'}
+        </div>
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <input type="text" id="userChatMsg" placeholder="Type your message...">
+            <button id="sendMsgBtn">Send</button>
+        </div>`;
     }
 
     let currentTab = 'dashboard';
@@ -285,7 +296,7 @@
         document.querySelectorAll('.completeTaskBtn').forEach(btn=>btn.addEventListener('click',()=>showSubmissionPopup(btn.dataset.id,btn.dataset.reward)));
         document.getElementById('submitModernKyc')?.addEventListener('click',submitModernKyc);
         document.getElementById('wdForm')?.addEventListener('submit',async(e)=>{ e.preventDefault(); let amt=document.getElementById('wdAmount').value; if(amt<100) return toast("Min ₹100","error"); await supabase.from('withdrawals').insert({ uid:currentUser.id, amount:amt, method:document.getElementById('wdMethod').value, details:document.getElementById('wdDetails').value, status:'pending' }); toast("Request sent","success"); renderPanel('withdraw'); });
-        document.getElementById('sendMsgBtn')?.addEventListener('click',async()=>{ let msg=document.getElementById('userChatMsg').value; if(msg){ await supabase.from('support_messages').insert({ uid:currentUser.id, message:msg, is_admin:false }); document.getElementById('userChatMsg').value=''; renderPanel('chat'); } });
+        document.getElementById('sendMsgBtn')?.addEventListener('click',async()=>{ let msg=document.getElementById('userChatMsg').value; if(msg){ await supabase.from('support_messages').insert({ uid:currentUser.id, message:msg, is_admin:false, created_at:new Date() }); document.getElementById('userChatMsg').value=''; renderPanel('chat'); } });
         document.querySelectorAll('.dropdown-header').forEach(header=>{
             header.addEventListener('click',()=>{
                 const targetId = header.getAttribute('data-dropdown')+'Content';
