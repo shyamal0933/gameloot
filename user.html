@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -27,10 +28,6 @@
         .task-card h3 { font-size:1.2rem; }
         .reward-badge { background:#00f2fe20; color:#00f2fe; padding:4px 12px; border-radius:40px; font-weight:bold; display:inline-block; margin:8px 0; }
         button { background:linear-gradient(95deg,#0055ff,#00c3ff); border:none; padding:8px 18px; border-radius:40px; color:white; font-weight:600; cursor:pointer; }
-        .btn-outline { background:transparent; border:1px solid #00f2fe; }
-        .modal-overlay { position:fixed; top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8); backdrop-filter:blur(10px); display:flex; align-items:center; justify-content:center; z-index:2000; }
-        .modal-card { background:#0f172a; border-radius:32px; max-width:500px; width:90%; padding:2rem; border:1px solid cyan; }
-        input, textarea { background:#1e293b; border:1px solid #334155; border-radius:28px; padding:12px; width:100%; margin:10px 0; color:white; }
         .referral-box { background:#0a0f1c; border-radius:20px; padding:1rem; margin-top:1rem; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
         @media (max-width:760px) { .sidebar { width:80px; } .sidebar span { display:none; } .main-panel { margin-left:80px; } }
         .status-badge { padding:2px 12px; border-radius:40px; font-size:0.7rem; background:#334155; }
@@ -52,11 +49,12 @@
 </div>
 
 <script>
-    // ======================= SUPABASE CONFIG (READY WITH YOUR KEYS) =======================
+    // ======================= SUPABASE CONFIG =======================
     const SUPABASE_URL = "https://kyvtlfatjtbpwemwtqof.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5dnRsZmF0anRicHdlbXd0cW9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzM1NDcsImV4cCI6MjA5NTgwOTU0N30.v_cHWMwXIfUZzedCnh6B-KPCGEFjJbld1PvRuDXqKIQ";
-    // ========================================================================================
+    // ================================================================
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
     let currentUser = null;
     let userProfile = null;
 
@@ -121,7 +119,7 @@
         return `<h2>Available Tasks</h2><div class="tasks-container">${tasks?.map(task => `
             <div class="task-card"><h3>${task.title}</h3><p>${task.description}</p><div class="reward-badge">+₹${task.reward}</div><p><i class="fas fa-tag"></i> ${task.category}</p>
             <button class="visitTaskBtn" data-link="${task.link}">Visit</button> <button class="completeTaskBtn" data-id="${task.id}" data-reward="${task.reward}">Complete Task</button></div>
-        `).join('') || '<p>No tasks yet.</p>'}</div>`;
+        `).join('') || '<p>No tasks yet. Admin will add soon.</p>'}</div>`;
     }
 
     async function renderReferrals() {
