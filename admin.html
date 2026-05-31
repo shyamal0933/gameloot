@@ -37,7 +37,6 @@
         .kyc-images-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:15px 0;}
         .kyc-image{background:#00000040;border-radius:16px;padding:8px;text-align:center;}
         .kyc-image img{max-width:100%;max-height:120px;border-radius:12px;cursor:pointer;background:#000;object-fit:contain;}
-        .kyc-image a{color:#00f2fe;font-size:0.7rem;word-break:break-all;}
         .debug-info{background:#1e1e2e;border-radius:16px;padding:8px;margin-top:10px;font-size:11px;font-family:monospace;word-break:break-all;}
     </style>
 </head>
@@ -113,7 +112,9 @@
         return `<div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
         <table><thead><tr><th>Title</th><th>Reward</th><th>Category</th><th>Link</th><th>Actions</th></tr></thead><tbody>
         ${tasks?.map(t => `<tr>
-            <td>${t.title}</td><td>₹${t.reward}</td><td>${t.category}</td>
+            <td>${t.title}</td>
+            <td>₹${t.reward}</td>
+            <td>${t.category}</td>
             <td><a href="${t.link}" target="_blank">Link</a></td>
             <td><button class="btn-sm deleteTask" data-id="${t.id}">Delete</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
@@ -169,12 +170,7 @@
                     <button class="btn-sm btn-approve verifyKyc" data-id="${k.id}" data-uid="${k.uid}">Approve KYC</button>
                     <button class="btn-sm btn-reject rejectKyc" data-id="${k.id}">Reject KYC</button>
                 </div>
-                <details class="debug-info"><summary>Stored paths</summary><pre>${JSON.stringify({
-                    aadhaar_front: k.aadhaar_front,
-                    aadhaar_back: k.aadhaar_back,
-                    pan_front_doc: k.pan_front_doc,
-                    user_hd_pic: k.user_hd_pic
-                }, null, 2)}</pre></details>
+                <details class="debug-info"><summary>Stored paths</summary><pre>${JSON.stringify({aadhaar_front:k.aadhaar_front, pan_front_doc:k.pan_front_doc},null,2)}</pre></details>
             </div>`;
         }
         return html;
@@ -199,7 +195,7 @@
     async function renderWithdrawals(){
         const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Withdrawals</h2>
-        <tr><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
+        <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
         ${wd?.map(w => `<tr>
             <td>${w.profiles?.name}</td>
             <td>₹${w.amount}</td>
@@ -212,13 +208,29 @@
     }
 
     async function renderChat(){
-        const { data: msgs } = await supabase.from('support_messages').select('*, profiles(name)').order('created_at');
-        return `<h2 class="section-title">Support Chat</h2>
-        <div id="chatMessages" style="height:300px; overflow-y:auto; background:#0f1222; border-radius:24px; padding:1rem;">
-            ${msgs?.map(m => `<div><strong>${m.profiles?.name||'User'}</strong> [${m.is_admin?'Admin':'User'}]: ${m.message}</div>`).join('')}
+        const { data: users } = await supabase.from('profiles').select('id, name, email');
+        let selectedUserId = localStorage.getItem('selectedChatUserId') || (users?.[0]?.id || '');
+        let messages = [];
+        if(selectedUserId){
+            const { data: msgs } = await supabase
+                .from('support_messages')
+                .select('*, profiles!uid(name)')
+                .or(`uid.eq.${selectedUserId},recipient_uid.eq.${selectedUserId}`)
+                .order('created_at', { ascending: true });
+            messages = msgs || [];
+        }
+        return `<h2 class="section-title">Support Chat (Private per User)</h2>
+        <div style="margin-bottom:1rem;">
+            <label>Select User: </label>
+            <select id="chatUserSelect">
+                ${users?.map(u => `<option value="${u.id}" ${selectedUserId === u.id ? 'selected' : ''}>${u.name || u.email}</option>`).join('')}
+            </select>
         </div>
-        <div style="margin-top:12px; display:flex;">
-            <input type="text" id="adminChatMsg" placeholder="Reply as Admin...">
+        <div id="chatMessages" style="height:300px; overflow-y:auto; background:#0f1222; border-radius:24px; padding:1rem; margin-bottom:1rem;">
+            ${messages.map(m => `<div><strong>${m.profiles?.name || (m.is_admin ? 'Admin' : 'User')}:</strong> ${m.message}</div>`).join('') || '<div>No messages yet.</div>'}
+        </div>
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="adminChatMsg" placeholder="Type your reply..." style="flex:1;">
             <button id="sendAdminReply">Send</button>
         </div>`;
     }
@@ -250,12 +262,44 @@
         document.querySelectorAll('.deleteUser').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('profiles').delete().eq('id', btn.dataset.id); Swal.fire("Deleted"); loadTab(activeTab); }));
         document.querySelectorAll('.approveWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', btn.dataset.id); Swal.fire("Withdrawal Approved"); loadTab(activeTab); }));
         document.querySelectorAll('.rejectWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'rejected' }).eq('id', btn.dataset.id); Swal.fire("Rejected"); loadTab(activeTab); }));
-        document.getElementById('sendAdminReply')?.addEventListener('click', async () => { const msg = document.getElementById('adminChatMsg').value; if(msg){ await supabase.from('support_messages').insert({ uid: currentAdmin.id, message: msg, is_admin: true, created_at: new Date() }); document.getElementById('adminChatMsg').value = ''; loadTab(activeTab); } });
+        
+        const sendBtn = document.getElementById('sendAdminReply');
+        if(sendBtn){
+            sendBtn.addEventListener('click', async () => {
+                const msg = document.getElementById('adminChatMsg').value;
+                const selectedUserId = document.getElementById('chatUserSelect')?.value;
+                if(!msg || !selectedUserId){
+                    Swal.fire("Error", "Please select a user and enter a message.", "warning");
+                    return;
+                }
+                const { error } = await supabase.from('support_messages').insert({
+                    uid: currentAdmin.id,
+                    recipient_uid: selectedUserId,
+                    message: msg,
+                    is_admin: true,
+                    created_at: new Date()
+                });
+                if(error){
+                    Swal.fire("Error", error.message, "error");
+                } else {
+                    document.getElementById('adminChatMsg').value = '';
+                    loadTab('chat');
+                }
+            });
+        }
+        const userSelect = document.getElementById('chatUserSelect');
+        if(userSelect){
+            userSelect.addEventListener('change', (e) => {
+                localStorage.setItem('selectedChatUserId', e.target.value);
+                loadTab('chat');
+            });
+        }
     }
 
     function showAddTaskModal(){
         Swal.fire({
-            title: 'New Task', html: `<input id="taskTitle" placeholder="Title"><textarea id="taskDesc" placeholder="Description"></textarea><input id="taskReward" placeholder="Reward"><input id="taskCategory" placeholder="Category"><input id="taskLink" placeholder="URL">`,
+            title: 'New Task',
+            html: `<input id="taskTitle" placeholder="Title"><textarea id="taskDesc" placeholder="Description"></textarea><input id="taskReward" placeholder="Reward"><input id="taskCategory" placeholder="Category"><input id="taskLink" placeholder="URL">`,
             preConfirm: () => ({ title: document.getElementById('taskTitle').value, desc: document.getElementById('taskDesc').value, reward: document.getElementById('taskReward').value, category: document.getElementById('taskCategory').value, link: document.getElementById('taskLink').value })
         }).then(async (r) => { if(r.value){ await supabase.from('tasks').insert({ title: r.value.title, description: r.value.desc, reward: parseInt(r.value.reward), category: r.value.category, link: r.value.link, created_at: new Date() }); Swal.fire("Task Added"); loadTab(activeTab); } });
     }
