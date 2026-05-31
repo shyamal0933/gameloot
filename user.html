@@ -145,9 +145,10 @@
     }
 
     async function renderKyc(){
-        const { data: existing } = await supabase.from('verifications').select('*').eq('uid', currentUser.id).single();
+        const { data: existing } = await supabase.from('verifications').select('*').eq('uid', currentUser.id).order('submitted_at', { ascending: false }).limit(1).maybeSingle();
         if(existing?.status === 'verified') return `<h2>KYC Status</h2><div class="stat-card">✅ Verified! You can withdraw.</div>`;
         if(existing?.status === 'pending') return `<h2>KYC Status</h2><div class="stat-card">⏳ Under review.</div>`;
+        // If rejected or no record, show form
         return `
         <h2 style="margin-bottom:1rem;"><i class="fas fa-id-card"></i> Complete KYC (Mandatory)</h2>
         <form id="kycModernForm">
@@ -185,9 +186,13 @@
         </form>`;
     }
 
-    async function uploadFile(file, fullPath){
+    async function uploadFile(file, baseName){
         if(!file) return null;
-        const { data, error } = await supabase.storage.from('kyc_docs').upload(fullPath, file, { upsert: true });
+        const timestamp = Date.now();
+        const ext = file.name.split('.').pop();
+        const fileName = `${baseName}_${timestamp}.${ext}`;
+        const fullPath = `${currentUser.id}/kyc/${fileName}`;
+        const { data, error } = await supabase.storage.from('kyc_docs').upload(fullPath, file, { upsert: false });
         if(error) throw error;
         return fullPath;
     }
@@ -214,17 +219,15 @@
         if(!hdPic) return toast("HD profile picture required","error");
         toast("Uploading documents...","info");
         try {
-            const folder = `${currentUser.id}/kyc`;
-            const profileFolder = `${currentUser.id}/profile`;
-            const aadFrontUrl = await uploadFile(aadFrontDoc, `${folder}/aad_front_doc`);
-            const aadBackUrl = await uploadFile(aadBackDoc, `${folder}/aad_back_doc`);
-            const aadFrontSelfieUrl = await uploadFile(aadFrontSelfie, `${folder}/aad_front_selfie`);
-            const aadBackSelfieUrl = await uploadFile(aadBackSelfie, `${folder}/aad_back_selfie`);
-            const panFrontUrl = await uploadFile(panFrontDoc, `${folder}/pan_front_doc`);
-            const panBackUrl = panBackDoc ? await uploadFile(panBackDoc, `${folder}/pan_back_doc`) : null;
-            const panFrontSelfieUrl = await uploadFile(panFrontSelfie, `${folder}/pan_front_selfie`);
-            const panBackSelfieUrl = panBackSelfie ? await uploadFile(panBackSelfie, `${folder}/pan_back_selfie`) : null;
-            const hdUrl = await uploadFile(hdPic, `${profileFolder}/hd.jpg`);
+            const aadFrontUrl = await uploadFile(aadFrontDoc, 'aad_front_doc');
+            const aadBackUrl = await uploadFile(aadBackDoc, 'aad_back_doc');
+            const aadFrontSelfieUrl = await uploadFile(aadFrontSelfie, 'aad_front_selfie');
+            const aadBackSelfieUrl = await uploadFile(aadBackSelfie, 'aad_back_selfie');
+            const panFrontUrl = await uploadFile(panFrontDoc, 'pan_front_doc');
+            const panBackUrl = panBackDoc ? await uploadFile(panBackDoc, 'pan_back_doc') : null;
+            const panFrontSelfieUrl = await uploadFile(panFrontSelfie, 'pan_front_selfie');
+            const panBackSelfieUrl = panBackSelfie ? await uploadFile(panBackSelfie, 'pan_back_selfie') : null;
+            const hdUrl = await uploadFile(hdPic, 'hd_profile');
             const { error } = await supabase.from('verifications').insert({
                 uid: currentUser.id,
                 full_name: userProfile.name,
