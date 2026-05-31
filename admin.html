@@ -2,41 +2,37 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>GameLoot Admin | Control Panel</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameLoot Admin Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; font-family:'Inter',sans-serif; }
-        body { background:#0a0c12; color:#eef2ff; }
-        .admin-container { display:flex; min-height:100vh; }
-        .sidebar { width:280px; background:rgba(18,22,35,0.85); backdrop-filter:blur(12px); border-right:1px solid rgba(0,255,255,0.2); padding:2rem 1rem; position:fixed; height:100vh; overflow-y:auto; transition:0.3s; }
-        .logo { font-size:1.8rem; font-weight:800; background:linear-gradient(135deg,#00f2fe,#4facfe); -webkit-background-clip:text; background-clip:text; color:transparent; margin-bottom:2rem; text-align:center; }
-        .nav-item { display:flex; align-items:center; gap:12px; padding:12px 18px; margin:8px 0; border-radius:16px; cursor:pointer; transition:0.2s; color:#b9c3e6; }
-        .nav-item i { width:24px; font-size:1.2rem; }
-        .nav-item.active, .nav-item:hover { background:rgba(0,242,254,0.15); color:#00f2fe; border-left:3px solid #00f2fe; }
-        .main-content { flex:1; margin-left:280px; padding:2rem; }
-        .dashboard-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1.5rem; margin-bottom:2rem; }
-        .card { background:rgba(20,25,45,0.7); backdrop-filter:blur(8px); border:1px solid rgba(0,255,255,0.2); border-radius:28px; padding:1.5rem; transition:transform 0.2s; }
-        .card h3 { font-size:1rem; font-weight:500; color:#8e9acf; }
-        .card .value { font-size:2.2rem; font-weight:700; margin-top:0.5rem; color:#fff; }
-        .section-title { font-size:1.4rem; font-weight:600; margin:2rem 0 1rem; border-left:4px solid #00f2fe; padding-left:1rem; }
-        table { width:100%; background:rgba(12,16,28,0.7); border-radius:24px; overflow:hidden; border-collapse:collapse; }
-        th, td { padding:14px 12px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.1); }
-        th { background:#0f1222; color:#00f2fe; }
-        .btn-sm { background:#1e2a47; border:none; padding:6px 12px; border-radius:40px; color:white; cursor:pointer; margin:0 4px; font-size:0.8rem; }
-        .btn-approve { background:#10b981; }
-        .btn-reject { background:#ef4444; }
-        .btn-warning { background:#f59e0b; }
-        .modal { position:fixed; top:0;left:0; width:100%;height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; z-index:1000; }
-        .modal-card { background:#111827; max-width:500px; width:90%; border-radius:32px; padding:2rem; border:1px solid #00f2fe; }
-        input, textarea, select { background:#1f2937; border:1px solid #374151; padding:10px; border-radius:20px; color:white; width:100%; margin:8px 0; }
-        button { background:linear-gradient(135deg,#00c6fb,#005bea); border:none; padding:10px 20px; border-radius:40px; color:white; font-weight:bold; cursor:pointer; }
-        @media (max-width:768px) { .sidebar { width:80px; padding:1rem 0.5rem; } .sidebar .logo { font-size:1rem; } .nav-item span { display:none; } .main-content { margin-left:80px; } }
-        .status-badge { padding:4px 10px; border-radius:30px; font-size:0.7rem; font-weight:bold; }
-        .flex-btns { display:flex; gap:6px; flex-wrap:wrap; }
+        *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
+        body{background:#0a0c12;color:#eef2ff;}
+        .admin-container{display:flex;min-height:100vh;}
+        .sidebar{width:280px;background:rgba(18,22,35,0.85);backdrop-filter:blur(12px);border-right:1px solid rgba(0,255,255,0.2);padding:2rem 1rem;position:fixed;height:100vh;overflow-y:auto;}
+        .logo{font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#00f2fe,#4facfe);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:2rem;text-align:center;}
+        .nav-item{display:flex;align-items:center;gap:12px;padding:12px 18px;margin:8px 0;border-radius:16px;cursor:pointer;color:#b9c3e6;}
+        .nav-item i{width:24px;}
+        .nav-item.active,.nav-item:hover{background:rgba(0,242,254,0.15);color:#00f2fe;border-left:3px solid #00f2fe;}
+        .main-content{flex:1;margin-left:280px;padding:2rem;}
+        .dashboard-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.5rem;margin-bottom:2rem;}
+        .card{background:rgba(20,25,45,0.7);backdrop-filter:blur(8px);border:1px solid rgba(0,255,255,0.2);border-radius:28px;padding:1.5rem;}
+        .card h3{font-size:1rem;color:#8e9acf;}
+        .card .value{font-size:2.2rem;font-weight:700;margin-top:0.5rem;}
+        .section-title{font-size:1.4rem;font-weight:600;margin:2rem 0 1rem;border-left:4px solid #00f2fe;padding-left:1rem;}
+        table{width:100%;background:rgba(12,16,28,0.7);border-radius:24px;overflow:hidden;border-collapse:collapse;}
+        th,td{padding:14px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.1);}
+        th{background:#0f1222;color:#00f2fe;}
+        .btn-sm{background:#1e2a47;border:none;padding:6px 12px;border-radius:40px;color:white;cursor:pointer;margin:0 4px;}
+        .btn-approve{background:#10b981;}
+        .btn-reject{background:#ef4444;}
+        .flex-btns{display:flex;gap:6px;flex-wrap:wrap;}
+        button{background:linear-gradient(135deg,#00c6fb,#005bea);border:none;padding:10px 20px;border-radius:40px;color:white;font-weight:bold;cursor:pointer;}
+        input,textarea,select{background:#1f2937;border:1px solid #374151;padding:10px;border-radius:20px;color:white;width:100%;margin:8px 0;}
+        @media (max-width:768px){.sidebar{width:80px;padding:1rem 0.5rem;}.sidebar .logo{font-size:1rem;}.nav-item span{display:none;}.main-content{margin-left:80px;}}
     </style>
 </head>
 <body>
@@ -54,179 +50,242 @@
     </div>
     <div class="main-content" id="adminMain"></div>
 </div>
-
 <script>
-    // ======================= SUPABASE CONFIG (READY WITH YOUR KEYS) =======================
-    const SUPABASE_URL = "https://kyvtlfatjtbpwemwtqof.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5dnRsZmF0anRicHdlbXd0cW9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzM1NDcsImV4cCI6MjA5NTgwOTU0N30.v_cHWMwXIfUZzedCnh6B-KPCGEFjJbld1PvRuDXqKIQ";
-    // ========================================================================================
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    let currentAdmin = null;
-
-    async function checkAdminAuth() {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            window.location.href = "user.html";
-            return;
+    (function() {
+        // ==================== YOUR SUPABASE CREDENTIALS ====================
+        const SUPABASE_URL = "https://kyvtlfatjtbpwemwtqof.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5dnRsZmF0anRicHdlbXd0cW9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzM1NDcsImV4cCI6MjA5NTgwOTU0N30.v_cHWMwXIfUZzedCnh6B-KPCGEFjJbld1PvRuDXqKIQ";
+        // ====================================================================
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let currentAdmin = null;
+        
+        async function checkAdminAuth() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                window.location.href = "user.html";
+                return;
+            }
+            const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single();
+            if (!profile || !profile.is_admin) {
+                await supabase.auth.signOut();
+                Swal.fire("Access Denied", "You are not an administrator.", "error");
+                window.location.href = "user.html";
+                return;
+            }
+            currentAdmin = user;
+            loadTab('dashboard');
         }
-        const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single();
-        if (!profile || !profile.is_admin) {
-            await supabase.auth.signOut();
-            Swal.fire("Access Denied", "You are not an administrator.", "error");
-            window.location.href = "user.html";
-            return;
+        
+        async function fetchStats() {
+            const { count: totalUsers } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+            const { count: totalTasks } = await supabase.from('tasks').select('*', { count: 'exact', head: true });
+            const { data: submissions } = await supabase.from('submissions').select('reward, status');
+            let totalRewards = 0;
+            submissions?.forEach(s => { if(s.status === 'approved') totalRewards += s.reward; });
+            const { count: pendingKyc } = await supabase.from('verifications').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+            const { count: pendingSub } = await supabase.from('submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+            return { totalUsers, totalTasks, totalRewards, pendingKyc, pendingSub };
         }
-        currentAdmin = user;
-        renderAdminPanel();
-    }
-
-    async function fetchStats() {
-        const { count: totalUsers } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-        const { count: totalTasks } = await supabase.from('tasks').select('*', { count: 'exact', head: true });
-        const { data: submissions } = await supabase.from('submissions').select('reward, status');
-        let totalRewards = 0;
-        submissions?.forEach(s => { if(s.status === 'approved') totalRewards += s.reward; });
-        const { count: pendingKyc } = await supabase.from('verifications').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-        const { count: pendingSub } = await supabase.from('submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-        return { totalUsers, totalTasks, totalRewards, pendingKyc, pendingSub };
-    }
-
-    async function renderDashboard() {
-        const stats = await fetchStats();
-        return `
-            <h2 class="section-title">Analytics</h2>
-            <div class="dashboard-cards">
-                <div class="card"><h3>Total Users</h3><div class="value">${stats.totalUsers || 0}</div></div>
-                <div class="card"><h3>Total Tasks</h3><div class="value">${stats.totalTasks || 0}</div></div>
-                <div class="card"><h3>Rewards Paid</h3><div class="value">₹${stats.totalRewards || 0}</div></div>
-                <div class="card"><h3>Pending KYC</h3><div class="value">${stats.pendingKyc || 0}</div></div>
-                <div class="card"><h3>Pending Submissions</h3><div class="value">${stats.pendingSub || 0}</div></div>
-            </div>
-        `;
-    }
-
-    async function renderTasks() {
-        const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
-        return `
-            <div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
-            <table><thead><tr><th>Title</th><th>Reward</th><th>Category</th><th>Link</th><th>Actions</th></tr></thead><tbody>
-            ${tasks?.map(task => `<tr>
-                <td>${task.title}</td><td>₹${task.reward}</td><td>${task.category}</td><td><a href="${task.link}" target="_blank">Link</a></td>
-                <td><button class="btn-sm editTask" data-id="${task.id}">Edit</button> <button class="btn-sm btn-reject deleteTask" data-id="${task.id}">Del</button></td>
-            </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
-            </tbody></table>
-        `;
-    }
-
-    async function renderSubmissions() {
-        const { data: subs } = await supabase.from('submissions').select('*, tasks(title), profiles(name)').eq('status', 'pending');
-        return `<h2 class="section-title">Pending Task Submissions</h2>
-        <table><thead><tr><th>User</th><th>Task</th><th>Proof</th><th>Reward</th><th>Action</th></tr></thead><tbody>
-        ${subs?.map(s => `<tr>
-            <td>${s.profiles?.name || 'User'}</td><td>${s.tasks?.title}</td><td>${s.proof?.slice(0,50)}</td><td>₹${s.reward}</td>
-            <td class="flex-btns"><button class="btn-sm btn-approve approveSub" data-id="${s.id}" data-uid="${s.uid}" data-reward="${s.reward}">Approve</button>
-            <button class="btn-sm btn-reject rejectSub" data-id="${s.id}">Reject</button></td>
-        </tr>`).join('') || '<tr><td colspan="5">No pending submissions</td></tr>'}
-        </tbody></table>`;
-    }
-
-    async function renderKyc() {
-        const { data: kycList } = await supabase.from('verifications').select('*').eq('status', 'pending');
-        return `<h2 class="section-title">KYC Verification Requests</h2>
-        <div style="display:grid; gap:1rem;">${kycList?.map(kyc => `
-            <div class="card" style="padding:1rem;"><strong>${kyc.full_name}</strong> | Aadhaar: ${kyc.aadhaar_number} | PAN: ${kyc.pan_number}<br>
-            <div><i class="fas fa-image"></i> <a href="${kyc.aadhaar_front}" target="_blank">Aadhaar Front</a> | <a href="${kyc.aadhaar_back}" target="_blank">Back</a> | <a href="${kyc.pan_front}" target="_blank">PAN</a> | <a href="${kyc.holding_selfie}" target="_blank">Holding Selfie</a></div>
-            <div class="flex-btns" style="margin-top:10px;"><button class="btn-sm btn-approve verifyKyc" data-id="${kyc.id}" data-uid="${kyc.uid}">Approve</button>
-            <button class="btn-sm btn-reject rejectKyc" data-id="${kyc.id}">Reject</button></div>
-            </div>`).join('') || '<p>No pending KYC</p>'}</div>`;
-    }
-
-    async function renderUsers() {
-        const { data: users } = await supabase.from('profiles').select('*');
-        return `<h2 class="section-title">User Management</h2>
-        <table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC Status</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-        ${users?.map(u => `<tr>
-            <td>${u.name || u.email}<br><small>${u.id}</small></td><td>₹${u.balance || 0}</td>
-            <td>${u.verification_status || 'pending'}</td><td>${u.fraud_score || 0}</td>
-            <td>${u.account_status || 'active'}</td>
-            <td><button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
-            <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button></td>
-        </tr>`).join('')}</tbody></table>`;
-    }
-
-    async function renderWithdrawals() {
-        const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
-        return `<h2 class="section-title">Withdrawals</h2><table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
-        ${wd?.map(w => `<tr><td>${w.profiles?.name}</td><td>₹${w.amount}</td><td>${w.method}</td><td>${w.details}</td>
-        <td><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
-        <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td></tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
-        </tbody></table>`;
-    }
-
-    async function renderChat() {
-        const { data: msgs } = await supabase.from('support_messages').select('*, profiles(name)').order('created_at', { ascending: true });
-        return `<h2 class="section-title">User Support Chat</h2><div id="chatMessages" style="height:300px; overflow-y:auto; background:#0f1222; border-radius:24px; padding:1rem;">${msgs?.map(m => `<div><strong>${m.profiles?.name || 'User'}</strong> [${m.is_admin ? 'Admin' : 'User'}]: ${m.message}</div>`).join('')}</div>
-        <div style="margin-top:12px; display:flex;"><input type="text" id="adminChatMsg" placeholder="Reply as Admin..."><button id="sendAdminReply">Send</button></div>`;
-    }
-
-    let activeTab = 'dashboard';
-    function loadTab(tab) {
-        activeTab = tab;
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        document.querySelector(`.nav-item[data-tab="${tab}"]`)?.classList.add('active');
-        refreshContent();
-    }
-    async function refreshContent() {
-        const mainDiv = document.getElementById('adminMain');
-        if(activeTab === 'dashboard') mainDiv.innerHTML = await renderDashboard();
-        else if(activeTab === 'tasks') mainDiv.innerHTML = await renderTasks();
-        else if(activeTab === 'submissions') mainDiv.innerHTML = await renderSubmissions();
-        else if(activeTab === 'kyc') mainDiv.innerHTML = await renderKyc();
-        else if(activeTab === 'users') mainDiv.innerHTML = await renderUsers();
-        else if(activeTab === 'withdrawals') mainDiv.innerHTML = await renderWithdrawals();
-        else if(activeTab === 'chat') mainDiv.innerHTML = await renderChat();
-        attachDynamicEvents();
-    }
-
-    function attachDynamicEvents() {
-        document.getElementById('addTaskBtn')?.addEventListener('click', showAddTaskModal);
-        document.querySelectorAll('.editTask').forEach(btn => btn.addEventListener('click', (e) => editTask(btn.dataset.id)));
-        document.querySelectorAll('.deleteTask').forEach(btn => btn.addEventListener('click', async (e) => { await supabase.from('tasks').delete().eq('id', btn.dataset.id); Swal.fire("Deleted","","success"); refreshContent(); }));
-        document.querySelectorAll('.approveSub').forEach(btn => btn.addEventListener('click', async (e) => { await approveSubmission(btn.dataset.id, btn.dataset.uid, btn.dataset.reward); }));
-        document.querySelectorAll('.rejectSub').forEach(btn => btn.addEventListener('click', async (e) => { await supabase.from('submissions').update({ status: 'rejected' }).eq('id', btn.dataset.id); Swal.fire("Rejected"); refreshContent(); }));
-        document.querySelectorAll('.verifyKyc').forEach(btn => btn.addEventListener('click', async (e) => { await supabase.from('verifications').update({ status: 'verified' }).eq('id', btn.dataset.id); await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', btn.dataset.uid); Swal.fire("KYC Approved","","success"); refreshContent(); }));
-        document.querySelectorAll('.rejectKyc').forEach(btn => btn.addEventListener('click', async (e) => { await supabase.from('verifications').update({ status: 'rejected' }).eq('id', btn.dataset.id); Swal.fire("Rejected"); refreshContent(); }));
-        document.querySelectorAll('.suspendUser').forEach(btn => btn.addEventListener('click', async (e) => { const newStatus = btn.dataset.status === 'suspended' ? 'active' : 'suspended'; await supabase.from('profiles').update({ account_status: newStatus }).eq('id', btn.dataset.id); Swal.fire(`User ${newStatus}`); refreshContent(); }));
-        document.querySelectorAll('.deleteUser').forEach(btn => btn.addEventListener('click', async (e) => { await supabase.from('profiles').delete().eq('id', btn.dataset.id); Swal.fire("Deleted"); refreshContent(); }));
-        document.querySelectorAll('.approveWd').forEach(btn => btn.addEventListener('click', async (e) => { await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', btn.dataset.id); Swal.fire("Withdrawal Approved"); refreshContent(); }));
-        document.querySelectorAll('.rejectWd').forEach(btn => btn.addEventListener('click', async (e) => { await supabase.from('withdrawals').update({ status: 'rejected' }).eq('id', btn.dataset.id); Swal.fire("Rejected"); refreshContent(); }));
-        document.getElementById('sendAdminReply')?.addEventListener('click', async () => { const msg = document.getElementById('adminChatMsg').value; if(msg) { await supabase.from('support_messages').insert({ uid: currentAdmin.id, message: msg, is_admin: true, created_at: new Date() }); document.getElementById('adminChatMsg').value=''; refreshContent(); } });
-    }
-
-    async function approveSubmission(subId, uid, rewardAmt) {
-        await supabase.from('submissions').update({ status: 'approved' }).eq('id', subId);
-        const { data: profile } = await supabase.from('profiles').select('balance').eq('id', uid).single();
-        const newBalance = (profile.balance || 0) + parseInt(rewardAmt);
-        await supabase.from('profiles').update({ balance: newBalance }).eq('id', uid);
-        Swal.fire("Approved! Reward added", "", "success");
-        refreshContent();
-    }
-
-    function showAddTaskModal() {
-        Swal.fire({
-            title: 'New Task', html: `<input id="taskTitle" placeholder="Title"><textarea id="taskDesc" placeholder="Description"></textarea><input id="taskReward" placeholder="Reward Amount"><input id="taskCategory" placeholder="Category"><input id="taskLink" placeholder="Task URL">`,
-            preConfirm: () => ({ title: document.getElementById('taskTitle').value, desc: document.getElementById('taskDesc').value, reward: document.getElementById('taskReward').value, category: document.getElementById('taskCategory').value, link: document.getElementById('taskLink').value }),
-            confirmButtonText: 'Create'
-        }).then(async (res) => { if(res.value) { await supabase.from('tasks').insert({ title: res.value.title, description: res.value.desc, reward: parseInt(res.value.reward), category: res.value.category, link: res.value.link, created_at: new Date() }); Swal.fire("Added"); refreshContent(); } });
-    }
-    async function editTask(id) { Swal.fire("Edit feature - Click on the task to modify (advanced)"); }
-
-    function renderAdminPanel() { loadTab('dashboard'); }
-
-    document.querySelectorAll('.nav-item[data-tab]').forEach(el => el.addEventListener('click', () => loadTab(el.dataset.tab)));
-    document.getElementById('adminLogoutBtn').addEventListener('click', async () => { await supabase.auth.signOut(); window.location.href = "user.html"; });
-    checkAdminAuth();
+        
+        async function renderDashboard() {
+            const stats = await fetchStats();
+            return `
+                <h2 class="section-title">Analytics</h2>
+                <div class="dashboard-cards">
+                    <div class="card"><h3>Total Users</h3><div class="value">${stats.totalUsers || 0}</div></div>
+                    <div class="card"><h3>Total Tasks</h3><div class="value">${stats.totalTasks || 0}</div></div>
+                    <div class="card"><h3>Rewards Paid</h3><div class="value">₹${stats.totalRewards || 0}</div></div>
+                    <div class="card"><h3>Pending KYC</h3><div class="value">${stats.pendingKyc || 0}</div></div>
+                    <div class="card"><h3>Pending Submissions</h3><div class="value">${stats.pendingSub || 0}</div></div>
+                </div>
+            `;
+        }
+        
+        async function renderTasks() {
+            const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+            return `
+                <div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
+                <table><thead><tr><th>Title</th><th>Reward</th><th>Category</th><th>Link</th><th>Actions</th></tr></thead><tbody>
+                ${tasks?.map(task => `
+                    <tr>
+                        <td>${task.title}</td><td>₹${task.reward}</td><td>${task.category}</td><td><a href="${task.link}" target="_blank">Link</a></td>
+                        <td><button class="btn-sm deleteTask" data-id="${task.id}">Delete</button></td>
+                    </tr>
+                `).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
+                </tbody></table>
+            `;
+        }
+        
+        async function renderSubmissions() {
+            const { data: subs } = await supabase.from('submissions').select('*, tasks(title), profiles(name)').eq('status', 'pending');
+            return `<h2 class="section-title">Pending Submissions</h2>
+                <table><thead><tr><th>User</th><th>Task</th><th>Proof</th><th>Reward</th><th>Action</th></tr></thead><tbody>
+                ${subs?.map(s => `
+                    <tr>
+                        <td>${s.profiles?.name || 'User'}</td><td>${s.tasks?.title}</td><td>${s.proof?.slice(0,50)}</td><td>₹${s.reward}</td>
+                        <td class="flex-btns"><button class="btn-sm btn-approve approveSub" data-id="${s.id}" data-uid="${s.uid}" data-reward="${s.reward}">Approve</button>
+                        <button class="btn-sm btn-reject rejectSub" data-id="${s.id}">Reject</button></td>
+                    </tr>
+                `).join('') || '<tr><td colspan="5">No pending submissions</td></tr>'}
+                </tbody></table>`;
+        }
+        
+        async function renderKyc() {
+            const { data: kycList } = await supabase.from('verifications').select('*').eq('status', 'pending');
+            return `<h2 class="section-title">KYC Requests</h2>
+                <div style="display:grid; gap:1rem;">${kycList?.map(kyc => `
+                    <div class="card"><strong>${kyc.full_name}</strong> | Aadhaar: ${kyc.aadhaar_number} | PAN: ${kyc.pan_number}<br>
+                    <a href="${kyc.aadhaar_front}" target="_blank">Aadhaar Front</a> | <a href="${kyc.aadhaar_back}" target="_blank">Back</a> | <a href="${kyc.pan_front}" target="_blank">PAN</a> | <a href="${kyc.holding_selfie}" target="_blank">Selfie</a>
+                    <div class="flex-btns"><button class="btn-sm btn-approve verifyKyc" data-id="${kyc.id}" data-uid="${kyc.uid}">Approve</button>
+                    <button class="btn-sm btn-reject rejectKyc" data-id="${kyc.id}">Reject</button></div></div>
+                `).join('') || '<p>No pending KYC</p>'}</div>`;
+        }
+        
+        async function renderUsers() {
+            const { data: users } = await supabase.from('profiles').select('*');
+            return `<h2 class="section-title">User Management</h2>
+                <table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+                ${users?.map(u => `
+                    <tr>
+                        <td>${u.name || u.email}<br><small>${u.id}</small></td><td>₹${u.balance||0}</td>
+                        <td>${u.verification_status||'pending'}</td><td>${u.fraud_score||0}</td>
+                        <td>${u.account_status||'active'}</td>
+                        <td><button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
+                        <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button></td>
+                    </tr>
+                `).join('')}</tbody></table>`;
+        }
+        
+        async function renderWithdrawals() {
+            const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
+            return `<h2 class="section-title">Withdrawals</h2>
+                <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
+                ${wd?.map(w => `
+                    <tr>
+                        <td>${w.profiles?.name}</td><td>₹${w.amount}</td><td>${w.method}</td><td>${w.details}</td>
+                        <td><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
+                        <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
+                    </tr>
+                `).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
+                </tbody></table>`;
+        }
+        
+        async function renderChat() {
+            const { data: msgs } = await supabase.from('support_messages').select('*, profiles(name)').order('created_at');
+            return `<h2 class="section-title">Support Chat</h2>
+                <div id="chatMessages" style="height:300px; overflow-y:auto; background:#0f1222; border-radius:24px; padding:1rem;">${msgs?.map(m => `<div><strong>${m.profiles?.name || 'User'}</strong> [${m.is_admin ? 'Admin' : 'User'}]: ${m.message}</div>`).join('')}</div>
+                <div style="margin-top:12px; display:flex;"><input type="text" id="adminChatMsg" placeholder="Reply as Admin..."><button id="sendAdminReply">Send</button></div>`;
+        }
+        
+        let activeTab = 'dashboard';
+        async function loadTab(tab) {
+            activeTab = tab;
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.querySelector(`.nav-item[data-tab="${tab}"]`)?.classList.add('active');
+            const mainDiv = document.getElementById('adminMain');
+            if(tab === 'dashboard') mainDiv.innerHTML = await renderDashboard();
+            else if(tab === 'tasks') mainDiv.innerHTML = await renderTasks();
+            else if(tab === 'submissions') mainDiv.innerHTML = await renderSubmissions();
+            else if(tab === 'kyc') mainDiv.innerHTML = await renderKyc();
+            else if(tab === 'users') mainDiv.innerHTML = await renderUsers();
+            else if(tab === 'withdrawals') mainDiv.innerHTML = await renderWithdrawals();
+            else if(tab === 'chat') mainDiv.innerHTML = await renderChat();
+            attachAdminEvents();
+        }
+        
+        function attachAdminEvents() {
+            document.getElementById('addTaskBtn')?.addEventListener('click', showAddTaskModal);
+            document.querySelectorAll('.deleteTask').forEach(btn => btn.addEventListener('click', async () => {
+                await supabase.from('tasks').delete().eq('id', btn.dataset.id);
+                Swal.fire("Deleted","","success");
+                loadTab(activeTab);
+            }));
+            document.querySelectorAll('.approveSub').forEach(btn => btn.addEventListener('click', async () => {
+                await supabase.from('submissions').update({ status: 'approved' }).eq('id', btn.dataset.id);
+                const { data: profile } = await supabase.from('profiles').select('balance').eq('id', btn.dataset.uid).single();
+                const newBalance = (profile.balance || 0) + parseInt(btn.dataset.reward);
+                await supabase.from('profiles').update({ balance: newBalance }).eq('id', btn.dataset.uid);
+                Swal.fire("Approved! Reward added","","success");
+                loadTab(activeTab);
+            }));
+            document.querySelectorAll('.rejectSub').forEach(btn => btn.addEventListener('click', async () => {
+                await supabase.from('submissions').update({ status: 'rejected' }).eq('id', btn.dataset.id);
+                Swal.fire("Rejected");
+                loadTab(activeTab);
+            }));
+            document.querySelectorAll('.verifyKyc').forEach(btn => btn.addEventListener('click', async () => {
+                await supabase.from('verifications').update({ status: 'verified' }).eq('id', btn.dataset.id);
+                await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', btn.dataset.uid);
+                Swal.fire("KYC Approved","","success");
+                loadTab(activeTab);
+            }));
+            document.querySelectorAll('.rejectKyc').forEach(btn => btn.addEventListener('click', async () => {
+                await supabase.from('verifications').update({ status: 'rejected' }).eq('id', btn.dataset.id);
+                Swal.fire("Rejected");
+                loadTab(activeTab);
+            }));
+            document.querySelectorAll('.suspendUser').forEach(btn => btn.addEventListener('click', async () => {
+                const newStatus = btn.dataset.status === 'suspended' ? 'active' : 'suspended';
+                await supabase.from('profiles').update({ account_status: newStatus }).eq('id', btn.dataset.id);
+                Swal.fire(`User ${newStatus}`);
+                loadTab(activeTab);
+            }));
+            document.querySelectorAll('.deleteUser').forEach(btn => btn.addEventListener('click', async () => {
+                await supabase.from('profiles').delete().eq('id', btn.dataset.id);
+                Swal.fire("Deleted");
+                loadTab(activeTab);
+            }));
+            document.querySelectorAll('.approveWd').forEach(btn => btn.addEventListener('click', async () => {
+                await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', btn.dataset.id);
+                Swal.fire("Withdrawal Approved");
+                loadTab(activeTab);
+            }));
+            document.querySelectorAll('.rejectWd').forEach(btn => btn.addEventListener('click', async () => {
+                await supabase.from('withdrawals').update({ status: 'rejected' }).eq('id', btn.dataset.id);
+                Swal.fire("Rejected");
+                loadTab(activeTab);
+            }));
+            document.getElementById('sendAdminReply')?.addEventListener('click', async () => {
+                const msg = document.getElementById('adminChatMsg').value;
+                if(msg) {
+                    await supabase.from('support_messages').insert({ uid: currentAdmin.id, message: msg, is_admin: true, created_at: new Date() });
+                    document.getElementById('adminChatMsg').value = '';
+                    loadTab(activeTab);
+                }
+            });
+        }
+        
+        function showAddTaskModal() {
+            Swal.fire({
+                title: 'New Task',
+                html: `<input id="taskTitle" placeholder="Title"><textarea id="taskDesc" placeholder="Description"></textarea><input id="taskReward" placeholder="Reward Amount"><input id="taskCategory" placeholder="Category"><input id="taskLink" placeholder="Task URL">`,
+                preConfirm: () => ({
+                    title: document.getElementById('taskTitle').value,
+                    desc: document.getElementById('taskDesc').value,
+                    reward: document.getElementById('taskReward').value,
+                    category: document.getElementById('taskCategory').value,
+                    link: document.getElementById('taskLink').value
+                })
+            }).then(async (res) => {
+                if(res.value) {
+                    await supabase.from('tasks').insert({
+                        title: res.value.title,
+                        description: res.value.desc,
+                        reward: parseInt(res.value.reward),
+                        category: res.value.category,
+                        link: res.value.link,
+                        created_at: new Date()
+                    });
+                    Swal.fire("Task Added","","success");
+                    loadTab(activeTab);
+                }
+            });
+        }
+        
+        document.querySelectorAll('.nav-item[data-tab]').forEach(el => el.addEventListener('click', () => loadTab(el.dataset.tab)));
+        document.getElementById('adminLogoutBtn').addEventListener('click', async () => { await supabase.auth.signOut(); window.location.href = "user.html"; });
+        checkAdminAuth();
+    })();
 </script>
 </body>
 </html>
