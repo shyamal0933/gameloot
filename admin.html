@@ -63,29 +63,13 @@
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let currentAdmin = null;
 
-    // Helper: generate signed URL for a storage path (improved with error handling)
     async function getSignedUrl(path, expiresIn = 3600) {
         if (!path) return null;
         try {
             const { data, error } = await supabase.storage.from('kyc_docs').createSignedUrl(path, expiresIn);
-            if (error) {
-                console.error(`Signed URL error for ${path}:`, error);
-                return null;
-            }
+            if (error) { console.error(`Signed URL error for ${path}:`, error); return null; }
             return data.signedUrl;
-        } catch (e) {
-            console.error("Unexpected error generating signed URL:", e);
-            return null;
-        }
-    }
-
-    // Helper: check if file exists in storage
-    async function fileExists(path) {
-        if (!path) return false;
-        const { data, error } = await supabase.storage.from('kyc_docs').list(path.split('/').slice(0, -1).join('/'), { limit: 100 });
-        if (error) return false;
-        const fileName = path.split('/').pop();
-        return data.some(f => f.name === fileName);
+        } catch(e) { console.error(e); return null; }
     }
 
     async function checkAdminAuth(){
@@ -127,7 +111,7 @@
     async function renderTasks(){
         const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
         return `<div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
-        <table><thead><tr><th>Title</th><th>Reward</th><th>Category</th><th>Link</th><th>Actions</th></tr></thead><tbody>
+        <tr><thead><tr><th>Title</th><th>Reward</th><th>Category</th><th>Link</th><th>Actions</th></tr></thead><tbody>
         ${tasks?.map(t => `<tr>
             <td>${t.title}</td><td>₹${t.reward}</td><td>${t.category}</td><td><a href="${t.link}" target="_blank">Link</a></td>
             <td><button class="btn-sm deleteTask" data-id="${t.id}">Delete</button></td>
@@ -140,7 +124,9 @@
         return `<h2 class="section-title">Pending Submissions</h2>
         <table><thead><tr><th>User</th><th>Task</th><th>Proof</th><th>Reward</th><th>Action</th></tr></thead><tbody>
         ${subs?.map(s => `<tr>
-            <td>${s.profiles?.name}</td><td>${s.tasks?.title}</td><td>${s.proof?.slice(0,50)}</td>
+            <td>${s.profiles?.name}</td>
+            <td>${s.tasks?.title}</td>
+            <td>${s.proof?.slice(0,50)}</td>
             <td class="flex-btns"><button class="btn-sm btn-approve approveSub" data-id="${s.id}" data-uid="${s.uid}" data-reward="${s.reward}">Approve</button><button class="btn-sm btn-reject rejectSub" data-id="${s.id}">Reject</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No pending submissions</td></tr>'}
         </tbody></table>`;
@@ -154,7 +140,6 @@
             const {data:prof}=await supabase.from('profiles').select('name,email').eq('id',k.uid).single();
             const userName = prof?.name || prof?.email || k.uid;
             
-            // Generate signed URLs for each image
             const aadFrontUrl = await getSignedUrl(k.aadhaar_front);
             const aadBackUrl = await getSignedUrl(k.aadhaar_back);
             const aadFrontSelfieUrl = await getSignedUrl(k.aadhaar_front_selfie);
@@ -165,33 +150,31 @@
             const panBackSelfieUrl = await getSignedUrl(k.pan_back_selfie);
             const hdPicUrl = await getSignedUrl(k.user_hd_pic);
             
-            // Check existence for debug (optional)
-            const aadFrontExists = k.aadhaar_front ? await fileExists(k.aadhaar_front) : false;
-            
             html += `<div class="kyc-review-card">
                 <h3>${userName}</h3>
-                <p><strong>Aadhaar Number:</strong> ${k.aadhaar_number || '-'}</p>
-                <p><strong>PAN Number:</strong> ${k.pan_number || '-'}</p>
+                <p><strong>Aadhaar:</strong> ${k.aadhaar_number || '-'}</p>
+                <p><strong>PAN:</strong> ${k.pan_number || '-'}</p>
                 <div class="kyc-images-grid">
-                    ${aadFrontUrl ? `<div class="kyc-image"><img src="${aadFrontUrl}" onerror="this.src='https://placehold.co/150x100?text=Load+Error'"><br><a href="${aadFrontUrl}" target="_blank">Aadhaar Front</a></div>` : `<div class="kyc-image"><span style="color:red;">❌ Aadhaar Front not available</span><br><small>${k.aadhaar_front || 'missing'}</small></div>`}
-                    ${aadBackUrl ? `<div class="kyc-image"><img src="${aadBackUrl}" onerror="this.src='https://placehold.co/150x100?text=Load+Error'"><br>Aadhaar Back</div>` : `<div class="kyc-image"><span style="color:red;">❌ Aadhaar Back missing</span></div>`}
-                    ${aadFrontSelfieUrl ? `<div class="kyc-image"><img src="${aadFrontSelfieUrl}" onerror="this.src='https://placehold.co/150x100?text=Load+Error'"><br>Aadhaar Front Selfie</div>` : `<div class="kyc-image"><span style="color:red;">❌ Aadhaar Front Selfie missing</span></div>`}
-                    ${aadBackSelfieUrl ? `<div class="kyc-image"><img src="${aadBackSelfieUrl}" onerror="this.src='https://placehold.co/150x100?text=Load+Error'"><br>Aadhaar Back Selfie</div>` : `<div class="kyc-image"><span style="color:red;">❌ Aadhaar Back Selfie missing</span></div>`}
-                    ${panFrontDocUrl ? `<div class="kyc-image"><img src="${panFrontDocUrl}" onerror="this.src='https://placehold.co/150x100?text=Load+Error'"><br>PAN Front Doc</div>` : `<div class="kyc-image"><span style="color:red;">❌ PAN Front missing</span></div>`}
-                    ${panBackDocUrl ? `<div class="kyc-image"><img src="${panBackDocUrl}" onerror="this.src='https://placehold.co/150x100?text=Load+Error'"><br>PAN Back Doc</div>` : `<div class="kyc-image"><span style="color:red;">❌ PAN Back missing</span></div>`}
-                    ${panFrontSelfieUrl ? `<div class="kyc-image"><img src="${panFrontSelfieUrl}" onerror="this.src='https://placehold.co/150x100?text=Load+Error'"><br>PAN Front Selfie</div>` : `<div class="kyc-image"><span style="color:red;">❌ PAN Front Selfie missing</span></div>`}
-                    ${panBackSelfieUrl ? `<div class="kyc-image"><img src="${panBackSelfieUrl}" onerror="this.src='https://placehold.co/150x100?text=Load+Error'"><br>PAN Back Selfie</div>` : `<div class="kyc-image"><span style="color:red;">❌ PAN Back Selfie missing</span></div>`}
-                    ${hdPicUrl ? `<div class="kyc-image"><img src="${hdPicUrl}" onerror="this.src='https://placehold.co/150x100?text=Load+Error'"><br>HD Profile Pic</div>` : `<div class="kyc-image"><span style="color:red;">❌ HD Pic missing</span></div>`}
+                    ${aadFrontUrl ? `<div class="kyc-image"><img src="${aadFrontUrl}" onerror="this.src='https://placehold.co/150x100?text=Error'"><br>Aadhaar Front</div>` : '<div class="kyc-image">❌ Aadhaar Front missing</div>'}
+                    ${aadBackUrl ? `<div class="kyc-image"><img src="${aadBackUrl}" onerror="this.src='https://placehold.co/150x100?text=Error'"><br>Aadhaar Back</div>` : '<div class="kyc-image">❌ Aadhaar Back missing</div>'}
+                    ${aadFrontSelfieUrl ? `<div class="kyc-image"><img src="${aadFrontSelfieUrl}" onerror="this.src='https://placehold.co/150x100?text=Error'"><br>Aadhaar Front Selfie</div>` : '<div class="kyc-image">❌ Aadhaar Front Selfie missing</div>'}
+                    ${aadBackSelfieUrl ? `<div class="kyc-image"><img src="${aadBackSelfieUrl}" onerror="this.src='https://placehold.co/150x100?text=Error'"><br>Aadhaar Back Selfie</div>` : '<div class="kyc-image">❌ Aadhaar Back Selfie missing</div>'}
+                    ${panFrontDocUrl ? `<div class="kyc-image"><img src="${panFrontDocUrl}" onerror="this.src='https://placehold.co/150x100?text=Error'"><br>PAN Front Doc</div>` : '<div class="kyc-image">❌ PAN Front missing</div>'}
+                    ${panBackDocUrl ? `<div class="kyc-image"><img src="${panBackDocUrl}" onerror="this.src='https://placehold.co/150x100?text=Error'"><br>PAN Back Doc</div>` : '<div class="kyc-image">❌ PAN Back missing</div>'}
+                    ${panFrontSelfieUrl ? `<div class="kyc-image"><img src="${panFrontSelfieUrl}" onerror="this.src='https://placehold.co/150x100?text=Error'"><br>PAN Front Selfie</div>` : '<div class="kyc-image">❌ PAN Front Selfie missing</div>'}
+                    ${panBackSelfieUrl ? `<div class="kyc-image"><img src="${panBackSelfieUrl}" onerror="this.src='https://placehold.co/150x100?text=Error'"><br>PAN Back Selfie</div>` : '<div class="kyc-image">❌ PAN Back Selfie missing</div>'}
+                    ${hdPicUrl ? `<div class="kyc-image"><img src="${hdPicUrl}" onerror="this.src='https://placehold.co/150x100?text=Error'"><br>HD Profile Pic</div>` : '<div class="kyc-image">❌ HD Pic missing</div>'}
                 </div>
                 <div class="flex-btns">
                     <button class="btn-sm btn-approve verifyKyc" data-id="${k.id}" data-uid="${k.uid}">Approve KYC</button>
                     <button class="btn-sm btn-reject rejectKyc" data-id="${k.id}">Reject KYC</button>
                 </div>
-                <details class="debug-info">
-                    <summary>Debug: stored paths</summary>
-                    <pre>Aadhaar Front: ${k.aadhaar_front || 'null'}\nAadhaar Back: ${k.aadhaar_back || 'null'}\nAadhaar Front Selfie: ${k.aadhaar_front_selfie || 'null'}\nAadhaar Back Selfie: ${k.aadhaar_back_selfie || 'null'}\nPAN Front Doc: ${k.pan_front_doc || 'null'}\nPAN Back Doc: ${k.pan_back_doc || 'null'}\nPAN Front Selfie: ${k.pan_front_selfie || 'null'}\nPAN Back Selfie: ${k.pan_back_selfie || 'null'}\nHD Pic: ${k.user_hd_pic || 'null'}</pre>
-                    <button class="btn-sm testSignedUrl" data-path="${k.aadhaar_front || ''}">Test Signed URL for Aadhaar Front</button>
-                </details>
+                <details class="debug-info"><summary>Stored paths</summary><pre>${JSON.stringify({
+                    aadhaar_front: k.aadhaar_front,
+                    aadhaar_back: k.aadhaar_back,
+                    pan_front_doc: k.pan_front_doc,
+                    user_hd_pic: k.user_hd_pic
+                }, null, 2)}</pre></details>
             </div>`;
         }
         return html;
@@ -202,7 +185,8 @@
         return `<h2 class="section-title">User Management</h2>
         <table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
         ${users?.map(u => `<tr>
-            <td>${u.name||u.email}<br><small>${u.id}</small></td><td>₹${u.balance||0}</td>
+            <td>${u.name||u.email}<br><small>${u.id}</small></td>
+            <td>₹${u.balance||0}</td>
             <td>${u.verification_status||'pending'}</td>
             <td>${u.fraud_score||0}</td>
             <td>${u.account_status||'active'}</td>
@@ -267,18 +251,6 @@
         document.querySelectorAll('.approveWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', btn.dataset.id); Swal.fire("Withdrawal Approved"); loadTab(activeTab); }));
         document.querySelectorAll('.rejectWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'rejected' }).eq('id', btn.dataset.id); Swal.fire("Rejected"); loadTab(activeTab); }));
         document.getElementById('sendAdminReply')?.addEventListener('click', async () => { const msg = document.getElementById('adminChatMsg').value; if(msg){ await supabase.from('support_messages').insert({ uid: currentAdmin.id, message: msg, is_admin: true, created_at: new Date() }); document.getElementById('adminChatMsg').value = ''; loadTab(activeTab); } });
-        
-        // Test signed URL button
-        document.querySelectorAll('.testSignedUrl').forEach(btn => btn.addEventListener('click', async (e) => {
-            const path = btn.dataset.path;
-            if (!path) return Swal.fire("No path", "Path is empty", "info");
-            const url = await getSignedUrl(path);
-            if (url) {
-                Swal.fire({ title: "Signed URL", html: `<a href="${url}" target="_blank">Open image</a><br><pre style="word-break:break-all">${url}</pre>`, icon: "info" });
-            } else {
-                Swal.fire("Failed", "Could not generate signed URL. File may not exist or permissions error.", "error");
-            }
-        }));
     }
 
     function showAddTaskModal(){
