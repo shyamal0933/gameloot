@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GameLoot Admin Panel</title>
+    <title>GameLoot Admin | Full Control</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -55,172 +55,148 @@
     <div class="main-content" id="adminMain"></div>
 </div>
 <script>
-    (function(){
-        const SUPABASE_URL = "https://kyvtlfatjtbpwemwtqof.supabase.co";
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5dnRsZmF0anRicHdlbXd0cW9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzM1NDcsImV4cCI6MjA5NTgwOTU0N30.v_cHWMwXIfUZzedCnh6B-KPCGEFjJbld1PvRuDXqKIQ";
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        let currentAdmin = null;
+(function(){
+    const SUPABASE_URL = "https://kyvtlfatjtbpwemwtqof.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5dnRsZmF0anRicHdlbXd0cW9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzM1NDcsImV4cCI6MjA5NTgwOTU0N30.v_cHWMwXIfUZzedCnh6B-KPCGEFjJbld1PvRuDXqKIQ";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let currentAdmin = null;
 
-        async function checkAdminAuth(){
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
-            if (userError || !user) {
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'Not Logged In',
-                    text: 'Please log in first.',
-                    confirmButtonText: 'OK'
-                });
-                window.location.href = "user.html";
-                return;
-            }
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('is_admin, email')
-                .eq('id', user.id)
-                .single();
-            if (profileError || !profile) {
-                await Swal.fire({
-                    icon: 'error',
-                    title: 'Profile Error',
-                    html: `Your user profile does not exist in the 'profiles' table.<br>Please sign out and sign in again to auto-create it.<br><br>Error: ${profileError?.message || 'No profile'}`
-                });
-                window.location.href = "user.html";
-                return;
-            }
-            if (!profile.is_admin) {
-                await Swal.fire({
-                    icon: 'warning',
-                    title: 'Access Denied',
-                    html: `Your account (${profile.email}) is not an administrator.<br><br>To fix, run this SQL in Supabase:<br><code style="background:#1e1e2e;padding:4px;display:block;">UPDATE profiles SET is_admin = true WHERE email = '${profile.email}';</code><br>Then log out and log in again.`,
-                    confirmButtonText: 'OK'
-                });
-                window.location.href = "user.html";
-                return;
-            }
-            currentAdmin = user;
-            loadTab('dashboard');
+    async function checkAdminAuth(){
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { window.location.href = "user.html"; return; }
+        const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single();
+        if (!profile || !profile.is_admin) {
+            await supabase.auth.signOut();
+            Swal.fire("Access Denied", "You are not an administrator.", "error");
+            window.location.href = "user.html";
+            return;
         }
+        currentAdmin = user;
+        loadTab('dashboard');
+    }
 
-        async function fetchStats(){
-            const { count: totalUsers } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-            const { count: totalTasks } = await supabase.from('tasks').select('*', { count: 'exact', head: true });
-            const { data: submissions } = await supabase.from('submissions').select('reward, status');
-            let totalRewards = 0;
-            submissions?.forEach(s => { if(s.status === 'approved') totalRewards += s.reward; });
-            const { count: pendingKyc } = await supabase.from('verifications').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-            const { count: pendingSub } = await supabase.from('submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-            return { totalUsers, totalTasks, totalRewards, pendingKyc, pendingSub };
+    async function fetchStats(){
+        const { count: totalUsers } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+        const { count: totalTasks } = await supabase.from('tasks').select('*', { count: 'exact', head: true });
+        const { data: submissions } = await supabase.from('submissions').select('reward, status');
+        let totalRewards = 0;
+        submissions?.forEach(s => { if(s.status === 'approved') totalRewards += s.reward; });
+        const { count: pendingKyc } = await supabase.from('verifications').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+        const { count: pendingSub } = await supabase.from('submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+        return { totalUsers, totalTasks, totalRewards, pendingKyc, pendingSub };
+    }
+
+    async function renderDashboard(){
+        const s = await fetchStats();
+        return `<h2 class="section-title">Analytics</h2><div class="dashboard-cards">
+            <div class="card"><h3>Total Users</h3><div class="value">${s.totalUsers||0}</div></div>
+            <div class="card"><h3>Total Tasks</h3><div class="value">${s.totalTasks||0}</div></div>
+            <div class="card"><h3>Rewards Paid</h3><div class="value">₹${s.totalRewards||0}</div></div>
+            <div class="card"><h3>Pending KYC</h3><div class="value">${s.pendingKyc||0}</div></div>
+            <div class="card"><h3>Pending Submissions</h3><div class="value">${s.pendingSub||0}</div></div>
+        </div>`;
+    }
+
+    async function renderTasks(){
+        const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+        return `<div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
+        <table><thead><tr><th>Title</th><th>Reward</th><th>Category</th><th>Link</th><th>Actions</th></tr></thead><tbody>
+        ${tasks?.map(t => `<tr><td>${t.title}</td><td>₹${t.reward}</td><td>${t.category}</td><td><a href="${t.link}" target="_blank">Link</a></td><td><button class="btn-sm deleteTask" data-id="${t.id}">Delete</button></td></tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
+        </tbody></table>`;
+    }
+
+    async function renderSubmissions(){
+        const { data: subs } = await supabase.from('submissions').select('*, tasks(title), profiles(name)').eq('status', 'pending');
+        return `<h2 class="section-title">Pending Submissions</h2>
+        <table><thead><tr><th>User</th><th>Task</th><th>Proof</th><th>Reward</th><th>Action</th></tr></thead><tbody>
+        ${subs?.map(s => `<tr><td>${s.profiles?.name}</td><td>${s.tasks?.title}</td><td>${s.proof?.slice(0,50)}</td><td>₹${s.reward}</td><td class="flex-btns"><button class="btn-sm btn-approve approveSub" data-id="${s.id}" data-uid="${s.uid}" data-reward="${s.reward}">Approve</button><button class="btn-sm btn-reject rejectSub" data-id="${s.id}">Reject</button></td></tr>`).join('') || '<tr><td colspan="5">No pending submissions</td></tr>'}
+        </tbody></table>`;
+    }
+
+    async function renderKyc(){
+        const { data: kycList } = await supabase.from('verifications').select('*').eq('status', 'pending');
+        if(!kycList?.length) return `<h2 class="section-title">KYC Reviews</h2><p>No pending KYC requests.</p>`;
+        let html = `<h2 class="section-title">KYC Verification Requests</h2>`;
+        for(const k of kycList){
+            const {data:prof}=await supabase.from('profiles').select('name,email').eq('id',k.uid).single();
+            const userName = prof?.name || prof?.email || k.uid;
+            html += `<div class="kyc-review-card"><h3>${userName}</h3><p><strong>Aadhaar:</strong> ${k.aadhaar_number || '-'}</p><p><strong>PAN:</strong> ${k.pan_number || '-'}</p><div class="kyc-images-grid">
+                ${k.aadhaar_front ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.aadhaar_front).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>Aadhaar Front</div>` : ''}
+                ${k.aadhaar_back ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.aadhaar_back).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>Aadhaar Back</div>` : ''}
+                ${k.aadhaar_front_selfie ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.aadhaar_front_selfie).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>Aadhaar Front Selfie</div>` : ''}
+                ${k.aadhaar_back_selfie ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.aadhaar_back_selfie).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>Aadhaar Back Selfie</div>` : ''}
+                ${k.pan_front_doc ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.pan_front_doc).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>PAN Front Doc</div>` : ''}
+                ${k.pan_back_doc ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.pan_back_doc).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>PAN Back Doc</div>` : ''}
+                ${k.pan_front_selfie ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.pan_front_selfie).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>PAN Front Selfie</div>` : ''}
+                ${k.pan_back_selfie ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.pan_back_selfie).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>PAN Back Selfie</div>` : ''}
+                ${k.user_hd_pic ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.user_hd_pic).data.publicUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>HD Profile Pic</div>` : ''}
+            </div><div class="flex-btns"><button class="btn-sm btn-approve verifyKyc" data-id="${k.id}" data-uid="${k.uid}">Approve KYC</button><button class="btn-sm btn-reject rejectKyc" data-id="${k.id}">Reject KYC</button></div></div>`;
         }
+        return html;
+    }
 
-        async function renderDashboard(){
-            const stats = await fetchStats();
-            return `<h2 class="section-title">Analytics</h2><div class="dashboard-cards">
-                <div class="card"><h3>Total Users</h3><div class="value">${stats.totalUsers||0}</div></div>
-                <div class="card"><h3>Total Tasks</h3><div class="value">${stats.totalTasks||0}</div></div>
-                <div class="card"><h3>Rewards Paid</h3><div class="value">₹${stats.totalRewards||0}</div></div>
-                <div class="card"><h3>Pending KYC</h3><div class="value">${stats.pendingKyc||0}</div></div>
-                <div class="card"><h3>Pending Submissions</h3><div class="value">${stats.pendingSub||0}</div></div>
-            </div>`;
-        }
+    async function renderUsers(){
+        const { data: users } = await supabase.from('profiles').select('*');
+        return `<h2 class="section-title">User Management</h2>
+        <table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+        ${users?.map(u => `<tr><td>${u.name||u.email}<br><small>${u.id}</small></td><td>₹${u.balance||0}</td><td>${u.verification_status||'pending'}</td><td>${u.fraud_score||0}</td><td>${u.account_status||'active'}</td><td><button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button><button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button></td></tr>`).join('')}
+        </tbody></table>`;
+    }
 
-        async function renderTasks(){
-            const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
-            return `<div style="display:flex;justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
-            <table><thead><tr><th>Title</th><th>Reward</th><th>Category</th><th>Link</th><th>Actions</th></tr></thead><tbody>
-            ${tasks?.map(t=>`<tr><td>${t.title}</td><td>₹${t.reward}</td><td>${t.category}</td><td><a href="${t.link}" target="_blank">Link</a></td><td><button class="btn-sm deleteTask" data-id="${t.id}">Delete</button></td></tr>`).join('')||'<tr><td colspan="5">No tasks</td></tr>'}
-            </tbody></table>`;
-        }
+    async function renderWithdrawals(){
+        const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
+        return `<h2 class="section-title">Withdrawals</h2>
+        <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
+        ${wd?.map(w => `<tr><td>${w.profiles?.name}</td><td>₹${w.amount}</td><td>${w.method}</td><td>${w.details}</td><td><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button><button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td></tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
+        </tbody></table>`;
+    }
 
-        async function renderSubmissions(){
-            const { data: subs } = await supabase.from('submissions').select('*, tasks(title), profiles(name)').eq('status','pending');
-            return `<h2 class="section-title">Pending Submissions</h2><table><thead><tr><th>User</th><th>Task</th><th>Proof</th><th>Reward</th><th>Action</th></tr></thead><tbody>
-            ${subs?.map(s=>`<tr><td>${s.profiles?.name}</td><td>${s.tasks?.title}</td><td>${s.proof?.slice(0,50)}</td><td>₹${s.reward}</td><td class="flex-btns"><button class="btn-sm btn-approve approveSub" data-id="${s.id}" data-uid="${s.uid}" data-reward="${s.reward}">Approve</button><button class="btn-sm btn-reject rejectSub" data-id="${s.id}">Reject</button></td></tr>`).join('')||'<tr><td colspan="5">No pending submissions</td></tr>'}
-            </tbody></table>`;
-        }
+    async function renderChat(){
+        const { data: msgs } = await supabase.from('support_messages').select('*, profiles(name)').order('created_at');
+        return `<h2 class="section-title">Support Chat</h2><div id="chatMessages" style="height:300px; overflow-y:auto; background:#0f1222; border-radius:24px; padding:1rem;">${msgs?.map(m => `<div><strong>${m.profiles?.name||'User'}</strong> [${m.is_admin?'Admin':'User'}]: ${m.message}</div>`).join('')}</div><div style="margin-top:12px; display:flex;"><input type="text" id="adminChatMsg" placeholder="Reply as Admin..."><button id="sendAdminReply">Send</button></div>`;
+    }
 
-        async function renderKyc(){
-            const { data: kycList } = await supabase.from('verifications').select('*').eq('status','pending');
-            if(!kycList?.length) return `<h2 class="section-title">KYC Reviews</h2><p>No pending KYC requests.</p>`;
-            let html = `<h2 class="section-title">KYC Verification Requests</h2>`;
-            for(const k of kycList){
-                const {data:prof}=await supabase.from('profiles').select('name,email').eq('id',k.uid).single();
-                const userName = prof?.name || prof?.email || k.uid;
-                html += `<div class="kyc-review-card"><h3>${userName}</h3>
-                <p><strong>Aadhaar:</strong> ${k.aadhaar_number || '-'}</p>
-                <p><strong>PAN:</strong> ${k.pan_number || '-'}</p>
-                <div class="kyc-images-grid">
-                    ${k.aadhaar_front ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.aadhaar_front).data.publicUrl}"><br>Aadhaar Front</div>` : ''}
-                    ${k.aadhaar_back ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.aadhaar_back).data.publicUrl}"><br>Aadhaar Back</div>` : ''}
-                    ${k.aadhaar_front_selfie ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.aadhaar_front_selfie).data.publicUrl}"><br>Aadhaar Front Selfie</div>` : ''}
-                    ${k.aadhaar_back_selfie ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.aadhaar_back_selfie).data.publicUrl}"><br>Aadhaar Back Selfie</div>` : ''}
-                    ${k.pan_front_doc ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.pan_front_doc).data.publicUrl}"><br>PAN Front</div>` : ''}
-                    ${k.pan_back_doc ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.pan_back_doc).data.publicUrl}"><br>PAN Back</div>` : ''}
-                    ${k.pan_front_selfie ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.pan_front_selfie).data.publicUrl}"><br>PAN Front Selfie</div>` : ''}
-                    ${k.pan_back_selfie ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.pan_back_selfie).data.publicUrl}"><br>PAN Back Selfie</div>` : ''}
-                    ${k.user_hd_pic ? `<div class="kyc-image"><img src="${supabase.storage.from('kyc_docs').getPublicUrl(k.user_hd_pic).data.publicUrl}"><br>HD Profile Pic</div>` : ''}
-                </div>
-                <div class="flex-btns"><button class="btn-sm btn-approve verifyKyc" data-id="${k.id}" data-uid="${k.uid}">Approve KYC</button><button class="btn-sm btn-reject rejectKyc" data-id="${k.id}">Reject KYC</button></div></div>`;
-            }
-            return html;
-        }
+    let activeTab = 'dashboard';
+    async function loadTab(tab){
+        activeTab = tab;
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        document.querySelector(`.nav-item[data-tab="${tab}"]`)?.classList.add('active');
+        const mainDiv = document.getElementById('adminMain');
+        if(tab === 'dashboard') mainDiv.innerHTML = await renderDashboard();
+        else if(tab === 'tasks') mainDiv.innerHTML = await renderTasks();
+        else if(tab === 'submissions') mainDiv.innerHTML = await renderSubmissions();
+        else if(tab === 'kyc') mainDiv.innerHTML = await renderKyc();
+        else if(tab === 'users') mainDiv.innerHTML = await renderUsers();
+        else if(tab === 'withdrawals') mainDiv.innerHTML = await renderWithdrawals();
+        else if(tab === 'chat') mainDiv.innerHTML = await renderChat();
+        attachEvents();
+    }
 
-        async function renderUsers(){
-            const { data: users } = await supabase.from('profiles').select('*');
-            return `<h2 class="section-title">User Management</h2><table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-            ${users?.map(u=>`<tr><td>${u.name||u.email}<br><small>${u.id}</small></td><td>₹${u.balance||0}</td><td>${u.verification_status||'pending'}</td><td>${u.fraud_score||0}</td><td>${u.account_status||'active'}</td><td><button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button><button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button></td></tr>`).join('')}
-            </tbody></table>`;
-        }
+    function attachEvents(){
+        document.getElementById('addTaskBtn')?.addEventListener('click', showAddTaskModal);
+        document.querySelectorAll('.deleteTask').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('tasks').delete().eq('id', btn.dataset.id); Swal.fire("Deleted"); loadTab(activeTab); }));
+        document.querySelectorAll('.approveSub').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('submissions').update({ status: 'approved' }).eq('id', btn.dataset.id); const { data: p } = await supabase.from('profiles').select('balance').eq('id', btn.dataset.uid).single(); const newBal = (p.balance || 0) + parseInt(btn.dataset.reward); await supabase.from('profiles').update({ balance: newBal }).eq('id', btn.dataset.uid); Swal.fire("Approved! Reward added."); loadTab(activeTab); }));
+        document.querySelectorAll('.rejectSub').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('submissions').update({ status: 'rejected' }).eq('id', btn.dataset.id); Swal.fire("Rejected"); loadTab(activeTab); }));
+        document.querySelectorAll('.verifyKyc').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('verifications').update({ status: 'verified' }).eq('id', btn.dataset.id); await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', btn.dataset.uid); Swal.fire("KYC Approved"); loadTab(activeTab); }));
+        document.querySelectorAll('.rejectKyc').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('verifications').update({ status: 'rejected' }).eq('id', btn.dataset.id); Swal.fire("Rejected"); loadTab(activeTab); }));
+        document.querySelectorAll('.suspendUser').forEach(btn => btn.addEventListener('click', async () => { const newStatus = btn.dataset.status === 'suspended' ? 'active' : 'suspended'; await supabase.from('profiles').update({ account_status: newStatus }).eq('id', btn.dataset.id); Swal.fire(`User ${newStatus}`); loadTab(activeTab); }));
+        document.querySelectorAll('.deleteUser').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('profiles').delete().eq('id', btn.dataset.id); Swal.fire("Deleted"); loadTab(activeTab); }));
+        document.querySelectorAll('.approveWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', btn.dataset.id); Swal.fire("Withdrawal Approved"); loadTab(activeTab); }));
+        document.querySelectorAll('.rejectWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'rejected' }).eq('id', btn.dataset.id); Swal.fire("Rejected"); loadTab(activeTab); }));
+        document.getElementById('sendAdminReply')?.addEventListener('click', async () => { const msg = document.getElementById('adminChatMsg').value; if(msg){ await supabase.from('support_messages').insert({ uid: currentAdmin.id, message: msg, is_admin: true, created_at: new Date() }); document.getElementById('adminChatMsg').value = ''; loadTab(activeTab); } });
+    }
 
-        async function renderWithdrawals(){
-            const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status','pending');
-            return `<h2 class="section-title">Withdrawals</h2><table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
-            ${wd?.map(w=>`<tr><td>${w.profiles?.name}</td><td>₹${w.amount}</td><td>${w.method}</td><td>${w.details}</td><td><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button><button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td></tr>`).join('')||'<tr><td colspan="5">No pending withdrawals</td></tr>'}
-            </tbody></table>`;
-        }
+    function showAddTaskModal(){
+        Swal.fire({
+            title: 'New Task', html: `<input id="taskTitle" placeholder="Title"><textarea id="taskDesc" placeholder="Description"></textarea><input id="taskReward" placeholder="Reward"><input id="taskCategory" placeholder="Category"><input id="taskLink" placeholder="URL">`,
+            preConfirm: () => ({ title: document.getElementById('taskTitle').value, desc: document.getElementById('taskDesc').value, reward: document.getElementById('taskReward').value, category: document.getElementById('taskCategory').value, link: document.getElementById('taskLink').value })
+        }).then(async (r) => { if(r.value){ await supabase.from('tasks').insert({ title: r.value.title, description: r.value.desc, reward: parseInt(r.value.reward), category: r.value.category, link: r.value.link, created_at: new Date() }); Swal.fire("Task Added"); loadTab(activeTab); } });
+    }
 
-        async function renderChat(){
-            const { data: msgs } = await supabase.from('support_messages').select('*, profiles(name)').order('created_at');
-            return `<h2 class="section-title">Support Chat</h2><div id="chatMessages" style="height:300px;overflow-y:auto;background:#0f1222;border-radius:24px;padding:1rem;">${msgs?.map(m=>`<div><strong>${m.profiles?.name||'User'}</strong> [${m.is_admin?'Admin':'User'}]: ${m.message}</div>`).join('')}</div><div style="margin-top:12px;display:flex;"><input type="text" id="adminChatMsg" placeholder="Reply as Admin..."><button id="sendAdminReply">Send</button></div>`;
-        }
-
-        let activeTab = 'dashboard';
-        async function loadTab(tab){
-            activeTab = tab;
-            document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
-            document.querySelector(`.nav-item[data-tab="${tab}"]`)?.classList.add('active');
-            const mainDiv = document.getElementById('adminMain');
-            if(tab==='dashboard') mainDiv.innerHTML = await renderDashboard();
-            else if(tab==='tasks') mainDiv.innerHTML = await renderTasks();
-            else if(tab==='submissions') mainDiv.innerHTML = await renderSubmissions();
-            else if(tab==='kyc') mainDiv.innerHTML = await renderKyc();
-            else if(tab==='users') mainDiv.innerHTML = await renderUsers();
-            else if(tab==='withdrawals') mainDiv.innerHTML = await renderWithdrawals();
-            else if(tab==='chat') mainDiv.innerHTML = await renderChat();
-            attachEvents();
-        }
-
-        function attachEvents(){
-            document.getElementById('addTaskBtn')?.addEventListener('click', showAddTaskModal);
-            document.querySelectorAll('.deleteTask').forEach(btn=>btn.addEventListener('click',async()=>{await supabase.from('tasks').delete().eq('id',btn.dataset.id); Swal.fire("Deleted"); loadTab(activeTab);}));
-            document.querySelectorAll('.approveSub').forEach(btn=>btn.addEventListener('click',async()=>{await supabase.from('submissions').update({status:'approved'}).eq('id',btn.dataset.id); const{data:p}=await supabase.from('profiles').select('balance').eq('id',btn.dataset.uid).single(); const newBal=(p.balance||0)+parseInt(btn.dataset.reward); await supabase.from('profiles').update({balance:newBal}).eq('id',btn.dataset.uid); Swal.fire("Approved! Reward added."); loadTab(activeTab);}));
-            document.querySelectorAll('.rejectSub').forEach(btn=>btn.addEventListener('click',async()=>{await supabase.from('submissions').update({status:'rejected'}).eq('id',btn.dataset.id); Swal.fire("Rejected"); loadTab(activeTab);}));
-            document.querySelectorAll('.verifyKyc').forEach(btn=>btn.addEventListener('click',async()=>{await supabase.from('verifications').update({status:'verified'}).eq('id',btn.dataset.id); await supabase.from('profiles').update({verification_status:'verified'}).eq('id',btn.dataset.uid); Swal.fire("KYC Approved"); loadTab(activeTab);}));
-            document.querySelectorAll('.rejectKyc').forEach(btn=>btn.addEventListener('click',async()=>{await supabase.from('verifications').update({status:'rejected'}).eq('id',btn.dataset.id); Swal.fire("Rejected"); loadTab(activeTab);}));
-            document.querySelectorAll('.suspendUser').forEach(btn=>btn.addEventListener('click',async()=>{const newStatus=btn.dataset.status==='suspended'?'active':'suspended'; await supabase.from('profiles').update({account_status:newStatus}).eq('id',btn.dataset.id); Swal.fire(`User ${newStatus}`); loadTab(activeTab);}));
-            document.querySelectorAll('.deleteUser').forEach(btn=>btn.addEventListener('click',async()=>{await supabase.from('profiles').delete().eq('id',btn.dataset.id); Swal.fire("Deleted"); loadTab(activeTab);}));
-            document.querySelectorAll('.approveWd').forEach(btn=>btn.addEventListener('click',async()=>{await supabase.from('withdrawals').update({status:'approved'}).eq('id',btn.dataset.id); Swal.fire("Withdrawal Approved"); loadTab(activeTab);}));
-            document.querySelectorAll('.rejectWd').forEach(btn=>btn.addEventListener('click',async()=>{await supabase.from('withdrawals').update({status:'rejected'}).eq('id',btn.dataset.id); Swal.fire("Rejected"); loadTab(activeTab);}));
-            document.getElementById('sendAdminReply')?.addEventListener('click',async()=>{const msg=document.getElementById('adminChatMsg').value; if(msg){await supabase.from('support_messages').insert({uid:currentAdmin.id,message:msg,is_admin:true}); document.getElementById('adminChatMsg').value=''; loadTab(activeTab);}});
-        }
-
-        function showAddTaskModal(){
-            Swal.fire({title:'New Task',html:`<input id="taskTitle" placeholder="Title"><textarea id="taskDesc" placeholder="Description"></textarea><input id="taskReward" placeholder="Reward"><input id="taskCategory" placeholder="Category"><input id="taskLink" placeholder="URL">`,preConfirm:()=>({title:document.getElementById('taskTitle').value,desc:document.getElementById('taskDesc').value,reward:document.getElementById('taskReward').value,category:document.getElementById('taskCategory').value,link:document.getElementById('taskLink').value})}).then(async(r)=>{if(r.value){await supabase.from('tasks').insert({title:r.value.title,description:r.value.desc,reward:parseInt(r.value.reward),category:r.value.category,link:r.value.link,created_at:new Date()}); Swal.fire("Task Added"); loadTab(activeTab);}});
-        }
-
-        document.querySelectorAll('.nav-item[data-tab]').forEach(el=>el.addEventListener('click',()=>loadTab(el.dataset.tab)));
-        document.getElementById('adminLogoutBtn').addEventListener('click',async()=>{await supabase.auth.signOut(); window.location.href="user.html";});
-        checkAdminAuth();
-    })();
+    document.querySelectorAll('.nav-item[data-tab]').forEach(el => el.addEventListener('click', () => loadTab(el.dataset.tab)));
+    document.getElementById('adminLogoutBtn').addEventListener('click', async () => { await supabase.auth.signOut(); window.location.href = "user.html"; });
+    checkAdminAuth();
+})();
 </script>
 </body>
 </html>
