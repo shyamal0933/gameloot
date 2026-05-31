@@ -65,10 +65,8 @@
     function toast(msg, icon='info'){ Swal.fire({toast:true,position:'top-end',icon,title:msg,showConfirmButton:false,timer:3000}); }
 
     async function ensureProfile(userId, email){
-        // First try to fetch existing profile
         let { data: profile, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-        if (error && error.code === 'PGRST116') { // not found
-            console.log("Profile not found, creating new profile...");
+        if (error && error.code === 'PGRST116') {
             const newProfile = {
                 id: userId,
                 email: email,
@@ -84,16 +82,9 @@
                 created_at: new Date()
             };
             const { data: inserted, error: insertError } = await supabase.from('profiles').insert(newProfile).select().single();
-            if (insertError) {
-                console.error("Profile insert error:", insertError);
-                throw insertError;
-            }
+            if (insertError) throw insertError;
             profile = inserted;
-            toast("Account profile created successfully!", "success");
-        } else if (error) {
-            console.error("Profile fetch error:", error);
-            throw error;
-        }
+        } else if (error) throw error;
         return profile;
     }
 
@@ -106,15 +97,12 @@
             Swal.fire("Email Not Verified","Please verify your email.","error");
             showAuthModal(); return;
         }
-        // Ensure profile exists before anything else
         try {
             userProfile = await ensureProfile(user.id, user.email);
         } catch(err) {
-            console.error("Failed to ensure profile:", err);
-            toast("Profile setup failed. Please log out and log in again.", "error");
+            toast("Profile error. Please log out and log in again.", "error");
             return;
         }
-        // Handle referral from URL
         const ref = new URLSearchParams(window.location.search).get('ref');
         if(ref && !userProfile.referred_by){
             await supabase.from('profiles').update({ referred_by: ref }).eq('id', user.id);
@@ -199,27 +187,19 @@
 
     async function uploadFile(file, fullPath){
         if(!file) return null;
-        const { data, error } = await supabase.storage.from('kyc_docs').upload(fullPath, file, { upsert: true });
+        const { data, error } = await supabase.storage.from('KYC_DOCS').upload(fullPath, file, { upsert: true });
         if(error) throw error;
         return fullPath;
     }
 
     async function submitModernKyc(){
-        // FIRST: ensure profile exists to avoid foreign key violation
         if (!userProfile) {
-            toast("Refreshing profile...", "info");
-            try {
-                userProfile = await ensureProfile(currentUser.id, currentUser.email);
-            } catch(e) {
-                toast("Profile setup failed. Please log out and log in again.", "error");
-                return;
-            }
+            try { userProfile = await ensureProfile(currentUser.id, currentUser.email); }
+            catch(e) { toast("Profile setup failed. Please log out and log in again.", "error"); return; }
         }
-        
         const aadhaarNum = document.getElementById('aadhaarNum').value;
         const panNum = document.getElementById('panNum').value;
         if(!aadhaarNum || !panNum) return toast("Aadhaar and PAN numbers required","error");
-        
         const aadFrontDoc = document.getElementById('aadFrontDoc').files[0];
         const aadBackDoc = document.getElementById('aadBackDoc').files[0];
         const aadFrontSelfie = document.getElementById('aadFrontSelfie').files[0];
@@ -229,17 +209,13 @@
         const panFrontSelfie = document.getElementById('panFrontSelfie').files[0];
         const panBackSelfie = document.getElementById('panBackSelfie').files[0];
         const hdPic = document.getElementById('hdProfilePic').files[0];
-        
         if(!aadFrontDoc||!aadBackDoc||!aadFrontSelfie||!aadBackSelfie) return toast("All Aadhaar images required","error");
         if(!panFrontDoc||!panFrontSelfie) return toast("PAN front document and selfie required","error");
         if(!hdPic) return toast("HD profile picture required","error");
-        
         toast("Uploading documents...","info");
-        
         try {
             const folder = `${currentUser.id}/kyc`;
             const profileFolder = `${currentUser.id}/profile`;
-            
             const aadFrontUrl = await uploadFile(aadFrontDoc, `${folder}/aad_front_doc`);
             const aadBackUrl = await uploadFile(aadBackDoc, `${folder}/aad_back_doc`);
             const aadFrontSelfieUrl = await uploadFile(aadFrontSelfie, `${folder}/aad_front_selfie`);
@@ -249,8 +225,7 @@
             const panFrontSelfieUrl = await uploadFile(panFrontSelfie, `${folder}/pan_front_selfie`);
             const panBackSelfieUrl = panBackSelfie ? await uploadFile(panBackSelfie, `${folder}/pan_back_selfie`) : null;
             const hdUrl = await uploadFile(hdPic, `${profileFolder}/hd.jpg`);
-            
-            const { error: insertError } = await supabase.from('verifications').insert({
+            const { error } = await supabase.from('verifications').insert({
                 uid: currentUser.id,
                 full_name: userProfile.name,
                 aadhaar_number: aadhaarNum,
@@ -267,8 +242,7 @@
                 status: 'pending',
                 submitted_at: new Date()
             });
-            if(insertError) throw insertError;
-            
+            if(error) throw error;
             toast("KYC submitted successfully! Pending review.","success");
             renderPanel('kyc');
         } catch(err) {
@@ -309,7 +283,6 @@
         document.getElementById('submitModernKyc')?.addEventListener('click',submitModernKyc);
         document.getElementById('wdForm')?.addEventListener('submit',async(e)=>{ e.preventDefault(); let amt=document.getElementById('wdAmount').value; if(amt<100) return toast("Min ₹100","error"); await supabase.from('withdrawals').insert({ uid:currentUser.id, amount:amt, method:document.getElementById('wdMethod').value, details:document.getElementById('wdDetails').value, status:'pending' }); toast("Request sent","success"); renderPanel('withdraw'); });
         document.getElementById('sendMsgBtn')?.addEventListener('click',async()=>{ let msg=document.getElementById('userChatMsg').value; if(msg){ await supabase.from('support_messages').insert({ uid:currentUser.id, message:msg, is_admin:false }); document.getElementById('userChatMsg').value=''; renderPanel('chat'); } });
-        
         document.querySelectorAll('.dropdown-header').forEach(header=>{
             header.addEventListener('click',()=>{
                 const targetId = header.getAttribute('data-dropdown')+'Content';
@@ -320,7 +293,6 @@
                 else icon.classList.replace('fa-chevron-up','fa-chevron-down');
             });
         });
-        
         const setupPreview = (fileId, previewId) => {
             const inp = document.getElementById(fileId);
             if(inp) inp.addEventListener('change',(e)=>{
