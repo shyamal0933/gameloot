@@ -3,101 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>GameLoot | Advanced Tasks</title>
+    <title>GameLoot | Work Small, Earn Big</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* (same styles as previous final user.html) */
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Inter',sans-serif; }
-        body { background:#0b0e17; color:#eef5ff; padding-bottom:70px; }
-        .sidebar { position:fixed; top:0; left:0; width:280px; height:100vh; background:rgba(15,20,35,0.95); backdrop-filter:blur(16px); border-right:1px solid rgba(0,242,254,0.25); padding:2rem 1rem; z-index:100; transition:transform 0.3s; overflow-y:auto; }
-        .logo { font-size:1.8rem; font-weight:800; background:linear-gradient(135deg,#00f2fe,#4facfe); -webkit-background-clip:text; background-clip:text; color:transparent; margin-bottom:2rem; text-align:center; }
+        body { background:#0b0e17; color:#eef5ff; overflow-x:hidden; }
+        .top-bar { display:flex; justify-content:space-between; align-items:center; padding:1rem 2rem; background:rgba(10,14,23,0.8); backdrop-filter:blur(10px); border-bottom:1px solid rgba(0,242,254,0.2); position:sticky; top:0; z-index:100; }
+        .logo { font-size:1.6rem; font-weight:800; background:linear-gradient(135deg,#00f2fe,#4facfe); -webkit-background-clip:text; background-clip:text; color:transparent; }
+        .auth-buttons { display:flex; gap:12px; }
+        .btn-outline { background:transparent; border:1px solid #00f2fe; padding:8px 20px; border-radius:40px; color:#00f2fe; font-weight:600; cursor:pointer; transition:0.2s; }
+        .btn-outline:hover { background:rgba(0,242,254,0.1); transform:scale(1.02); }
+        .btn-primary { background:linear-gradient(95deg,#0055ff,#00c3ff); border:none; padding:8px 20px; border-radius:40px; color:white; font-weight:600; cursor:pointer; }
+        .hero { min-height:calc(100vh - 80px); display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:2rem; }
+        .hero h1 { font-size:3.5rem; font-weight:800; background:linear-gradient(135deg,#fff,#00f2fe); -webkit-background-clip:text; background-clip:text; color:transparent; margin-bottom:1rem; }
+        .hero p { font-size:1.2rem; color:#a0abcf; max-width:600px; margin-bottom:2rem; }
+        .hero-buttons { display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; }
+        .feature-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:2rem; margin-top:4rem; width:100%; max-width:1000px; }
+        .feature-card { background:rgba(20,28,45,0.7); backdrop-filter:blur(8px); border-radius:28px; padding:1.5rem; border:1px solid rgba(0,255,255,0.2); transition:0.3s; }
+        .feature-card i { font-size:2rem; color:#00f2fe; margin-bottom:1rem; }
+        .dashboard-container { display:flex; min-height:100vh; }
+        .sidebar { width:280px; background:rgba(15,20,35,0.95); backdrop-filter:blur(16px); border-right:1px solid rgba(0,242,254,0.25); padding:2rem 1rem; position:fixed; height:100vh; overflow-y:auto; }
         .nav-item { display:flex; align-items:center; gap:12px; padding:12px 20px; margin:6px 0; border-radius:40px; cursor:pointer; color:#a0abcf; transition:0.2s; }
         .nav-item i { width:26px; }
         .nav-item.active,.nav-item:hover { background:rgba(0,242,254,0.12); color:#00f2fe; }
-        .main-panel { margin-left:280px; padding:2rem; transition:margin 0.3s; }
+        .main-panel { flex:1; margin-left:280px; padding:2rem; transition:margin 0.3s; }
         .bottom-nav { display:none; position:fixed; bottom:0; left:0; width:100%; background:rgba(10,14,23,0.95); backdrop-filter:blur(20px); border-top:1px solid rgba(0,242,254,0.3); padding:10px 16px; justify-content:space-around; z-index:200; }
-        .bottom-nav-item { display:flex; flex-direction:column; align-items:center; gap:4px; color:#8e9acf; font-size:0.7rem; cursor:pointer; padding:6px 12px; border-radius:30px; }
+        .bottom-nav-item { display:flex; flex-direction:column; align-items:center; gap:4px; color:#8e9acf; font-size:0.7rem; cursor:pointer; }
         .bottom-nav-item i { font-size:1.4rem; }
-        .bottom-nav-item.active { color:#00f2fe; background:rgba(0,242,254,0.1); }
+        .bottom-nav-item.active { color:#00f2fe; }
         @media (max-width:768px) {
             .sidebar { transform:translateX(-100%); }
             .main-panel { margin-left:0; padding:1rem 1rem 80px 1rem; }
             .bottom-nav { display:flex; }
+            .hero h1 { font-size:2rem; }
         }
         .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; margin-bottom:2rem; }
-        .stat-card { background:rgba(20,28,45,0.7); backdrop-filter:blur(8px); border-radius:28px; padding:1.2rem; border:1px solid rgba(0,255,255,0.2); transition:0.2s; }
-        .stat-card:hover { transform:translateY(-3px); box-shadow:0 8px 20px rgba(0,242,254,0.1); }
-        .stat-card h4 { font-size:0.8rem; color:#8e9acf; margin-bottom:8px; }
-        .stat-card .value { font-size:1.8rem; font-weight:700; }
+        .stat-card { background:rgba(20,28,45,0.7); backdrop-filter:blur(8px); border-radius:28px; padding:1.2rem; border:1px solid rgba(0,255,255,0.2); }
         .tasks-container { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:1.2rem; margin-top:1rem; }
-        .task-card { background:#111827; border-radius:28px; padding:1.2rem; border:1px solid #2a3448; transition:0.2s; display:flex; flex-direction:column; }
-        .task-card:hover { border-color:#00f2fe; transform:scale(1.01); }
-        .reward-badge { background:rgba(0,242,254,0.15); color:#00f2fe; padding:4px 12px; border-radius:40px; display:inline-block; margin:8px 0; font-weight:600; }
-        button { background:linear-gradient(95deg,#0055ff,#00c3ff); border:none; padding:10px 20px; border-radius:40px; color:white; font-weight:600; cursor:pointer; transition:0.2s; }
-        button:active { transform:scale(0.96); }
+        .task-card { background:#111827; border-radius:28px; padding:1.2rem; border:1px solid #2a3448; }
+        .reward-badge { background:rgba(0,242,254,0.15); color:#00f2fe; padding:4px 12px; border-radius:40px; display:inline-block; margin:8px 0; }
+        button { background:linear-gradient(95deg,#0055ff,#00c3ff); border:none; padding:10px 20px; border-radius:40px; color:white; font-weight:600; cursor:pointer; }
+        .btn-sm { padding:6px 12px; font-size:0.8rem; background:#1e2a47; }
         .referral-box { background:#0a0f1c; border-radius:20px; padding:1rem; margin-top:1rem; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
-        .kyc-card { background:rgba(12,18,28,0.8); border-radius:32px; padding:1.2rem; margin-bottom:1.5rem; border:1px solid #2a3a5a; }
+        .kyc-card, .payment-method-card { background:rgba(12,18,28,0.8); border-radius:32px; padding:1rem; margin-bottom:1rem; border:1px solid #2a3a5a; }
         .dropdown-header { display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:10px; background:#0a0f1a; border-radius:60px; margin-bottom:1rem; }
         .dropdown-content { display:none; padding:0.5rem 0; }
         .dropdown-content.open { display:block; }
         .file-group { margin-bottom:1rem; background:#131c2c; padding:10px; border-radius:20px; }
-        .file-group label { display:block; margin-bottom:5px; font-weight:500; }
         input, textarea, select { background:#1e293b; border:1px solid #334155; border-radius:28px; padding:12px; width:100%; color:white; }
         .image-preview { width:70px; height:70px; object-fit:cover; border-radius:12px; margin-top:8px; border:1px solid cyan; }
         .chat-box { height:280px; overflow-y:auto; background:#0f1222; border-radius:24px; padding:1rem; margin-bottom:1rem; }
-        .payment-method-card { background:#0f172a; border-radius:20px; padding:1rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
-        .payment-badge { background:#00f2fe20; color:#00f2fe; padding:4px 12px; border-radius:40px; font-size:0.8rem; }
-        .btn-sm { padding:6px 12px; font-size:0.8rem; background:#1e2a47; }
+        .help-content { background:#0f1222; border-radius:16px; padding:1rem; margin:1rem 0; }
         .countdown { font-size:0.8rem; background:#00000050; padding:4px 8px; border-radius:20px; display:inline-block; margin-top:8px; }
-        .help-content { background:#0f1222; border-radius:16px; padding:1rem; margin:1rem 0; font-size:0.9rem; }
-        .task-detail-modal { max-height:80vh; overflow-y:auto; }
-        .rejection-reason { background:#7f1a1a; border-radius:12px; padding:0.8rem; margin-bottom:1rem; }
     </style>
 </head>
 <body>
-
-<!-- Desktop Sidebar -->
-<div class="sidebar" id="sidebar">
-    <div class="logo">🎮 GAMELOOT</div>
-    <div class="nav-item active" data-tab="dashboard"><i class="fas fa-home"></i><span>Dashboard</span></div>
-    <div class="nav-item" data-tab="tasks"><i class="fas fa-tasks"></i><span>Earn Tasks</span></div>
-    <div class="nav-item" data-tab="referrals"><i class="fas fa-user-plus"></i><span>Referrals</span></div>
-    <div class="nav-item" data-tab="kyc"><i class="fas fa-id-card"></i><span>KYC</span></div>
-    <div class="nav-item" data-tab="withdraw"><i class="fas fa-rupee-sign"></i><span>Withdraw</span></div>
-    <div class="nav-item" data-tab="chat"><i class="fas fa-headset"></i><span>Support</span></div>
-    <div class="nav-item" id="userLogoutBtn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></div>
-</div>
-
-<!-- Mobile Bottom Nav -->
-<div class="bottom-nav" id="bottomNav">
-    <div class="bottom-nav-item active" data-tab="dashboard"><i class="fas fa-home"></i><span>Home</span></div>
-    <div class="bottom-nav-item" data-tab="tasks"><i class="fas fa-tasks"></i><span>Tasks</span></div>
-    <div class="bottom-nav-item" data-tab="referrals"><i class="fas fa-user-plus"></i><span>Refer</span></div>
-    <div class="bottom-nav-item" data-tab="kyc"><i class="fas fa-id-card"></i><span>KYC</span></div>
-    <div class="bottom-nav-item" data-tab="withdraw"><i class="fas fa-rupee-sign"></i><span>Withdraw</span></div>
-    <div class="bottom-nav-item" data-tab="chat"><i class="fas fa-headset"></i><span>Chat</span></div>
-</div>
-
-<div class="main-panel" id="userMainPanel"></div>
+<div id="root"></div>
 
 <script>
-(function(){
     const SUPABASE_URL = "https://kyvtlfatjtbpwemwtqof.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5dnRsZmF0anRicHdlbXd0cW9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzM1NDcsImV4cCI6MjA5NTgwOTU0N30.v_cHWMwXIfUZzedCnh6B-KPCGEFjJbld1PvRuDXqKIQ";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    let currentUser = null, userProfile = null;
+    let currentUser = null;
+    let userProfile = null;
 
     function toast(msg, icon='info'){ Swal.fire({toast:true,position:'top-end',icon,title:msg,showConfirmButton:false,timer:3000}); }
 
-    async function ensureProfile(userId, email){
+    // ---------- Auth ----------
+    async function showSignUpModal() {
+        const { value: form } = await Swal.fire({
+            title: 'Create Account',
+            html: `<input id="signupName" class="swal2-input" placeholder="Full Name" required>
+                   <input id="signupEmail" class="swal2-input" placeholder="Email" required>
+                   <input id="signupPassword" type="password" class="swal2-input" placeholder="Password (min 6 chars)" required>
+                   <input id="signupRef" class="swal2-input" placeholder="Referral Code (optional)">`,
+            focusConfirm: false,
+            preConfirm: () => {
+                const name = document.getElementById('signupName').value;
+                const email = document.getElementById('signupEmail').value;
+                const password = document.getElementById('signupPassword').value;
+                const ref = document.getElementById('signupRef').value;
+                if (!name || !email || !password) Swal.showValidationMessage('All fields required');
+                if (password.length < 6) Swal.showValidationMessage('Password must be at least 6 characters');
+                return { name, email, password, ref };
+            }
+        });
+        if (form) {
+            const { error } = await supabase.auth.signUp({
+                email: form.email,
+                password: form.password,
+                options: { data: { name: form.name, referral: form.ref } }
+            });
+            if (error) toast(error.message, "error");
+            else {
+                toast("Verification email sent! Check your inbox and spam.", "success");
+                showSignInModal();
+            }
+        }
+    }
+
+    async function showSignInModal() {
+        const { value: form } = await Swal.fire({
+            title: 'Welcome Back',
+            html: `<input id="loginEmail" class="swal2-input" placeholder="Email" required>
+                   <input id="loginPassword" type="password" class="swal2-input" placeholder="Password" required>`,
+            preConfirm: () => ({
+                email: document.getElementById('loginEmail').value,
+                password: document.getElementById('loginPassword').value
+            })
+        });
+        if (form) {
+            const { error } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
+            if (error) toast(error.message, "error");
+            else location.reload();
+        }
+    }
+
+    async function ensureProfile(userId, email, metadataName) {
         let { data: profile, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
         if (error && error.code === 'PGRST116') {
+            const name = metadataName || email.split('@')[0];
             const newProfile = {
                 id: userId,
                 email: email,
-                name: email.split('@')[0],
+                name: name,
                 balance: 0,
                 verification_status: 'pending',
                 referral_code: 'GL' + Math.random().toString(36).substring(2,8).toUpperCase(),
@@ -115,90 +148,51 @@
         return profile;
     }
 
-    async function checkAuth(){
-        const { data: { user } } = await supabase.auth.getUser();
-        if(!user){ showAuthModal(); return; }
-        currentUser = user;
-        if(!user.email_confirmed_at){
-            await supabase.auth.signOut();
-            Swal.fire("Email Not Verified","Please verify your email.","error");
-            showAuthModal(); return;
-        }
-        try {
-            userProfile = await ensureProfile(user.id, user.email);
-        } catch(err) {
-            toast("Profile error. Please log out and log in again.", "error");
-            return;
-        }
-        const ref = new URLSearchParams(window.location.search).get('ref');
-        if(ref && !userProfile.referred_by){
-            await supabase.from('profiles').update({ referred_by: ref }).eq('id', user.id);
-            toast("Referral code applied!","success");
-        }
-        renderPanel('dashboard');
-    }
-
-    async function renderDashboard(){
+    // ---------- Dashboard ----------
+    async function renderDashboard() {
         const { data: submissions } = await supabase.from('submissions').select('status').eq('uid', currentUser.id);
         const total = submissions?.length || 0;
         const completed = submissions?.filter(s => s.status === 'approved').length || 0;
         return `
-        <div style="margin-bottom:1rem;"><h2>Welcome, ${userProfile.name || 'Explorer'} 🎯</h2></div>
+        <h2>Welcome, ${userProfile.name || 'Explorer'} 🎯</h2>
         <div class="stats-grid">
             <div class="stat-card"><h4>💰 Balance</h4><div class="value">₹${userProfile.balance||0}</div></div>
             <div class="stat-card"><h4>✅ KYC</h4><div class="value">${userProfile.verification_status?.toUpperCase()}</div></div>
             <div class="stat-card"><h4>📋 Tasks</h4><div class="value">${total}</div></div>
             <div class="stat-card"><h4>✔️ Done</h4><div class="value">${completed}</div></div>
-            <div class="stat-card"><h4>👥 Referrals</h4><div class="value">${userProfile.total_referrals||0}</div></div>
-            <div class="stat-card"><h4>🏆 Referral Earn</h4><div class="value">₹${userProfile.referral_earnings||0}</div></div>
+            <div class="stat-card"><h4>👥 Referrals</h4><div class="value">${userProfile.referral_count||0}</div></div>
+            <div class="stat-card"><h4>🏆 Referral Earnings</h4><div class="value">₹${userProfile.referral_earnings||0}</div></div>
         </div>
-        <div class="referral-box">
-            <span><i class="fas fa-link"></i> Your Code: <strong>${userProfile.referral_code}</strong></span>
-            <button id="copyCodeBtn" class="btn-sm">Copy Code</button>
-            <button id="copyLinkBtn" class="btn-sm">Copy Link</button>
-        </div>`;
+        <div class="referral-box"><span><i class="fas fa-link"></i> Your Code: <strong>${userProfile.referral_code}</strong></span>
+        <button id="copyCodeBtn" class="btn-sm">Copy Code</button><button id="copyLinkBtn" class="btn-sm">Copy Link</button></div>`;
     }
 
-    // ---------- TASKS: start modal, countdown, submit ----------
-    async function renderTasks(){
-        const { data: tasks } = await supabase.from('tasks').select('*').order('deadline', { ascending: true, nullsFirst: false });
+    // ---------- Tasks ----------
+    async function renderTasks() {
+        const { data: tasks } = await supabase.from('tasks').select('*');
         return `<h2>🔥 Available Tasks</h2>
-        <div class="tasks-container">
-            ${tasks?.map(t => `
-                <div class="task-card">
-                    <h3>${t.title}</h3>
-                    <p>${t.description}</p>
-                    <div class="reward-badge">+₹${t.reward}</div>
-                    <div><a href="${t.link}" target="_blank" class="btn-sm" style="display:inline-block;">Visit Task Link</a></div>
-                    ${t.deadline ? `<div class="countdown" data-deadline="${t.deadline}" data-id="${t.id}">Loading countdown...</div>` : ''}
-                    <div class="help-content" style="display:none;" id="help-${t.id}">${t.help_text || ''}</div>
-                    <button class="toggleHelpBtn" data-id="${t.id}">Show Help</button>
-                    <button class="startTaskBtn" data-task='${JSON.stringify(t)}'>Start Task</button>
-                </div>
-            `).join('') || '<p>No tasks yet. Admin will add soon.</p>'}
-        </div>`;
+        <div class="tasks-container">${tasks?.map(t => `
+            <div class="task-card">
+                <h3>${t.title}</h3>
+                <p>${t.description}</p>
+                <div class="reward-badge">+₹${t.reward}</div>
+                <div><a href="${t.link}" target="_blank" class="btn-sm">Visit Link</a></div>
+                ${t.deadline ? `<div class="countdown" data-deadline="${t.deadline}" data-id="${t.id}">Loading...</div>` : ''}
+                <div class="help-content" style="display:none;" id="help-${t.id}">${t.help_text || ''}</div>
+                <button class="toggleHelpBtn" data-id="${t.id}">Show Help</button>
+                <button class="startTaskBtn" data-task='${JSON.stringify(t)}'>Start Task</button>
+            </div>
+        `).join('') || '<p>No tasks yet.</p>'}</div>`;
     }
 
-    function initCountdowns(){
+    function initCountdowns() {
         document.querySelectorAll('.countdown').forEach(el => {
             const deadline = new Date(el.dataset.deadline);
             if(isNaN(deadline)) return;
-            function update(){
-                const now = new Date();
-                const diff = deadline - now;
-                if(diff <= 0){
-                    el.innerHTML = "⏰ Task expired";
-                    el.style.color = "#ef4444";
-                    const taskCard = el.closest('.task-card');
-                    const startBtn = taskCard?.querySelector('.startTaskBtn');
-                    if(startBtn) startBtn.disabled = true;
-                    clearInterval(interval);
-                } else {
-                    const hours = Math.floor(diff / (1000*60*60));
-                    const minutes = Math.floor((diff % (3600000)) / 60000);
-                    const seconds = Math.floor((diff % 60000) / 1000);
-                    el.innerHTML = `⏳ Deadline: ${hours}h ${minutes}m ${seconds}s`;
-                }
+            function update() {
+                const diff = deadline - new Date();
+                if(diff <= 0) { el.innerHTML = "⏰ Task expired"; el.style.color = "#ef4444"; const btn = el.closest('.task-card')?.querySelector('.startTaskBtn'); if(btn) btn.disabled = true; clearInterval(interval); }
+                else { const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000); el.innerHTML = `⏳ Deadline: ${h}h ${m}m ${s}s`; }
             }
             update();
             const interval = setInterval(update, 1000);
@@ -206,326 +200,198 @@
         });
     }
 
-    async function startTask(task){
-        // Check if already submitted
+    async function startTask(task) {
         const { data: existing } = await supabase.from('submissions').select('id, status, rejection_reason').eq('uid', currentUser.id).eq('task_id', task.id).maybeSingle();
-        if(existing && existing.status === 'pending'){
-            toast("You already have a pending submission for this task.", "warning");
-            return;
-        }
-        if(existing && existing.status === 'approved'){
-            toast("You have already completed this task.", "success");
-            return;
-        }
-        // If rejected, show reason and allow resubmission
-        let rejectionHtml = '';
-        if(existing && existing.status === 'rejected' && existing.rejection_reason){
-            rejectionHtml = `<div class="rejection-reason"><strong>Previous submission was rejected:</strong><br>${existing.rejection_reason}</div>`;
-        }
-        // Build dynamic form based on task.custom_fields
-        const customFields = task.custom_fields || [];
-        let fieldsHtml = '';
-        for(const field of customFields){
-            fieldsHtml += `<div style="margin-bottom:1rem;">
-                <label>${field.label} ${field.required ? '*' : ''}</label>`;
-            if(field.type === 'file'){
-                fieldsHtml += `<input type="file" id="field_${field.label.replace(/\s/g,'_')}" ${field.required ? 'required' : ''}>`;
-                fieldsHtml += `<div class="image-preview" id="preview_${field.label.replace(/\s/g,'_')}" style="display:none;"></div>`;
-            } else {
-                fieldsHtml += `<input type="${field.type}" id="field_${field.label.replace(/\s/g,'_')}" ${field.required ? 'required' : ''}>`;
-            }
-            fieldsHtml += `</div>`;
+        if(existing?.status === 'pending') return toast("Already pending.", "warning");
+        if(existing?.status === 'approved') return toast("Already completed!", "success");
+        let fieldsHtml = '', rejectionHtml = '';
+        if(existing?.status === 'rejected' && existing.rejection_reason) rejectionHtml = `<div style="background:#7f1a1a; padding:0.8rem; border-radius:12px; margin-bottom:1rem;"><strong>Rejected:</strong> ${existing.rejection_reason}</div>`;
+        for(const f of (task.custom_fields || [])) {
+            fieldsHtml += `<div><label>${f.label} ${f.required?'*':''}</label>${f.type==='file'?`<input type="file" id="field_${f.label.replace(/\s/g,'_')}" ${f.required?'required':''}>`:`<input type="${f.type}" id="field_${f.label.replace(/\s/g,'_')}" ${f.required?'required':''}>`}</div>`;
         }
         const { value: formData } = await Swal.fire({
             title: task.title,
-            html: `
-                <div class="task-detail-modal">
-                    <p><strong>Description:</strong> ${task.description}</p>
-                    <p><strong>Reward:</strong> ₹${task.reward}</p>
-                    <p><strong>Task Link:</strong> <a href="${task.link}" target="_blank">Open</a></p>
-                    <div class="help-content" style="background:#0f1222; padding:0.8rem; border-radius:16px;">${task.help_text || ''}</div>
-                    ${rejectionHtml}
-                    <hr>
-                    <h3>Complete the following</h3>
-                    ${fieldsHtml}
-                </div>
-            `,
+            html: `<div><p>${task.description}</p><p>Reward: ₹${task.reward}</p><a href="${task.link}" target="_blank">Open Link</a><div class="help-content">${task.help_text||''}</div>${rejectionHtml}<hr>${fieldsHtml}</div>`,
             width: '700px',
-            focusConfirm: false,
-            showCancelButton: true,
-            confirmButtonText: 'Submit Task',
             preConfirm: async () => {
                 let submissionData = {};
-                for(const field of customFields){
-                    const inputId = `field_${field.label.replace(/\s/g,'_')}`;
-                    const input = document.getElementById(inputId);
-                    if(field.type === 'file'){
+                for(const f of (task.custom_fields || [])) {
+                    const input = document.getElementById(`field_${f.label.replace(/\s/g,'_')}`);
+                    if(f.type === 'file') {
                         const file = input.files[0];
-                        if(field.required && !file){
-                            Swal.showValidationMessage(`${field.label} is required`);
-                            return false;
-                        }
-                        if(file){
-                            const fileName = `${Date.now()}_${file.name}`;
-                            const path = `task_submissions/${currentUser.id}/${task.id}/${fileName}`;
-                            const { data, error } = await supabase.storage.from('kyc_docs').upload(path, file);
-                            if(error){
-                                Swal.showValidationMessage(`Upload failed: ${error.message}`);
-                                return false;
-                            }
-                            submissionData[field.label] = data.path;
+                        if(f.required && !file) { Swal.showValidationMessage(`${f.label} required`); return false; }
+                        if(file) {
+                            const path = `task_submissions/${currentUser.id}/${task.id}/${Date.now()}_${file.name}`;
+                            const { error } = await supabase.storage.from('kyc_docs').upload(path, file);
+                            if(error) { Swal.showValidationMessage(error.message); return false; }
+                            submissionData[f.label] = path;
                         }
                     } else {
                         const val = input.value;
-                        if(field.required && !val){
-                            Swal.showValidationMessage(`${field.label} is required`);
-                            return false;
-                        }
-                        submissionData[field.label] = val;
+                        if(f.required && !val) { Swal.showValidationMessage(`${f.label} required`); return false; }
+                        submissionData[f.label] = val;
                     }
                 }
                 return { submissionData };
-            },
-            didOpen: () => {
-                // preview for file inputs
-                for(const field of customFields){
-                    if(field.type === 'file'){
-                        const input = document.getElementById(`field_${field.label.replace(/\s/g,'_')}`);
-                        const preview = document.getElementById(`preview_${field.label.replace(/\s/g,'_')}`);
-                        if(input && preview){
-                            input.addEventListener('change', (e) => {
-                                if(e.target.files[0]){
-                                    const reader = new FileReader();
-                                    reader.onload = (ev) => {
-                                        preview.src = ev.target.result;
-                                        preview.style.display = 'block';
-                                    };
-                                    reader.readAsDataURL(e.target.files[0]);
-                                }
-                            });
-                        }
-                    }
-                }
             }
         });
-        if(formData){
-            // Insert or update submission
-            if(existing && existing.status === 'rejected'){
-                // Update existing submission
-                const { error } = await supabase.from('submissions').update({
-                    submission_data: formData.submissionData,
-                    status: 'pending',
-                    rejection_reason: null,
-                    started_at: new Date(),
-                    created_at: new Date()
-                }).eq('id', existing.id);
-                if(error) toast(error.message, "error");
-                else { toast("Task resubmitted for review!","success"); renderPanel('tasks'); }
-            } else {
-                // New submission
-                const { error } = await supabase.from('submissions').insert({
-                    uid: currentUser.id,
-                    task_id: task.id,
-                    submission_data: formData.submissionData,
-                    status: 'pending',
-                    reward: task.reward,
-                    started_at: new Date(),
-                    created_at: new Date()
-                });
-                if(error) toast(error.message, "error");
-                else { toast("Task submitted for review!","success"); renderPanel('tasks'); }
-            }
+        if(formData) {
+            if(existing?.id) await supabase.from('submissions').update({ submission_data: formData.submissionData, status: 'pending', rejection_reason: null }).eq('id', existing.id);
+            else await supabase.from('submissions').insert({ uid: currentUser.id, task_id: task.id, submission_data: formData.submissionData, status: 'pending', reward: task.reward });
+            toast("Task submitted for review!", "success");
+            renderPanel('tasks');
         }
     }
 
     function attachTaskEvents(){
-        document.querySelectorAll('.toggleHelpBtn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const helpDiv = document.getElementById(`help-${btn.dataset.id}`);
-                if(helpDiv.style.display === 'none') {
-                    helpDiv.style.display = 'block';
-                    btn.textContent = 'Hide Help';
-                } else {
-                    helpDiv.style.display = 'none';
-                    btn.textContent = 'Show Help';
-                }
-            });
-        });
-        document.querySelectorAll('.startTaskBtn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const task = JSON.parse(btn.dataset.task);
-                startTask(task);
-            });
-        });
+        document.querySelectorAll('.toggleHelpBtn').forEach(btn => btn.addEventListener('click',()=>{ const div = document.getElementById(`help-${btn.dataset.id}`); if(div.style.display==='none'){ div.style.display='block'; btn.textContent='Hide Help'; } else { div.style.display='none'; btn.textContent='Show Help'; } }));
+        document.querySelectorAll('.startTaskBtn').forEach(btn => btn.addEventListener('click',()=>startTask(JSON.parse(btn.dataset.task))));
     }
 
-    // ---------- Referrals ----------
-    async function renderReferrals(){
+    // ---------- Referrals (Enhanced) ----------
+    async function renderReferrals() {
         const link = `${location.origin}${location.pathname}?ref=${userProfile.referral_code}`;
-        return `<h2>👥 Referral Program</h2>
+        const { data: referredUsers } = await supabase.from('profiles').select('id, email, name, verification_status, kyc_bonus_received, created_at').eq('referred_by', userProfile.referral_code);
+        const { data: commissions } = await supabase.from('referral_commissions').select('commission_amount').eq('referrer_uid', currentUser.id);
+        const totalCommission = commissions?.reduce((sum,c)=>sum+c.commission_amount,0) || 0;
+        const successfulReferrals = referredUsers?.filter(u => u.kyc_bonus_received === true).length || 0;
+        const pendingReferrals = referredUsers?.filter(u => u.kyc_bonus_received !== true).length || 0;
+        const remainingSlots = 100 - (userProfile.referral_count || 0);
+
+        let referredListHtml = '';
+        for(const ref of referredUsers || []) {
+            const { data: refComm } = await supabase.from('referral_commissions').select('commission_amount').eq('referrer_uid', currentUser.id).eq('referred_uid', ref.id);
+            const totalFromRef = refComm?.reduce((s,c)=>s+c.commission_amount,0) || 0;
+            referredListHtml += `
+                <div class="payment-method-card">
+                    <div><strong>${ref.name || ref.email}</strong><br>KYC: ${ref.verification_status}<br>Bonus paid: ${ref.kyc_bonus_received ? '✅' : '⏳'}</div>
+                    <div>Commission earned: ₹${totalFromRef}</div>
+                </div>
+            `;
+        }
+
+        return `
+        <h2>👥 Referral Program</h2>
         <div class="referral-box" style="flex-direction:column; align-items:start;">
             <div>🔗 ${link}</div>
             <button id="copyFullLinkBtn" class="btn-sm">Copy Link</button>
         </div>
-        <div class="stats-grid" style="margin-top:1rem;">
-            <div class="stat-card"><h4>Total Referrals</h4><div class="value">${userProfile.total_referrals||0}</div></div>
-            <div class="stat-card"><h4>Earnings</h4><div class="value">₹${userProfile.referral_earnings||0}</div></div>
+        <div class="stats-grid">
+            <div class="stat-card"><h4>Total Referrals</h4><div class="value">${userProfile.referral_count || 0}</div></div>
+            <div class="stat-card"><h4>Remaining Slots</h4><div class="value">${remainingSlots}</div></div>
+            <div class="stat-card"><h4>Referral Bonus Earned</h4><div class="value">₹${userProfile.referral_earnings || 0}</div></div>
+            <div class="stat-card"><h4>10% Commission Earned</h4><div class="value">₹${totalCommission}</div></div>
         </div>
-        <p class="status-badge" style="background:#334155; padding:8px; border-radius:40px; font-size:0.8rem;">⚠️ Bonus after referred user verifies email, KYC, completes 3 tasks & account >24h.</p>`;
+        <div style="background:#0f172a; border-radius:20px; padding:1rem; margin:1rem 0;">
+            <h3>📋 How It Works</h3>
+            <ul style="margin-left:1.5rem; line-height:1.8;">
+                <li>✅ Share your unique referral link.</li>
+                <li>✅ When your friend signs up and completes KYC, <strong>you get ₹50</strong> and <strong>they get ₹50</strong>.</li>
+                <li>✅ You also earn <strong>10% commission</strong> from every task reward your referred user earns (for life).</li>
+                <li>✅ You can refer up to <strong>100 users</strong>.</li>
+                <li>✅ No commission from their referrals (only direct referrals).</li>
+            </ul>
+        </div>
+        <h3>Your Referrals (${successfulReferrals} completed / ${pendingReferrals} pending)</h3>
+        <div id="referredList">${referredListHtml || '<p>No referrals yet. Share your link!</p>'}</div>
+        `;
     }
 
-    // ---------- KYC ----------
-    async function renderKyc(){
+    // ---------- KYC (same as before, compact) ----------
+    async function renderKyc() {
         const { data: existing } = await supabase.from('verifications').select('*').eq('uid', currentUser.id).order('submitted_at', { ascending: false }).limit(1).maybeSingle();
         if(existing?.status === 'verified') return `<h2>KYC Status</h2><div class="stat-card">✅ Verified! You can withdraw.</div>`;
         if(existing?.status === 'pending') return `<h2>KYC Status</h2><div class="stat-card">⏳ Under review.</div>`;
-        return `
-        <h2>📄 Complete KYC (Mandatory)</h2>
-        <form id="kycModernForm">
-            <div class="kyc-card">
-                <div class="dropdown-header" data-dropdown="aadhaar"><h3><i class="fas fa-id-card"></i> Aadhaar Verification</h3><i class="fas fa-chevron-down"></i></div>
-                <div id="aadhaarContent" class="dropdown-content">
-                    <input type="text" id="aadhaarNum" placeholder="Aadhaar Number" required>
-                    <div class="file-group"><label>Aadhaar Front</label><input type="file" id="aadFrontDoc" accept="image/*"><img id="previewAadFront" class="image-preview" style="display:none;"></div>
-                    <div class="file-group"><label>Aadhaar Back</label><input type="file" id="aadBackDoc" accept="image/*"><img id="previewAadBack" class="image-preview" style="display:none;"></div>
-                    <div class="file-group"><label>Aadhaar Front Selfie</label><input type="file" id="aadFrontSelfie" accept="image/*"><img id="previewAadFrontSelfie" class="image-preview" style="display:none;"></div>
-                    <div class="file-group"><label>Aadhaar Back Selfie</label><input type="file" id="aadBackSelfie" accept="image/*"><img id="previewAadBackSelfie" class="image-preview" style="display:none;"></div>
-                </div>
-            </div>
-            <div class="kyc-card">
-                <div class="dropdown-header" data-dropdown="pan"><h3><i class="fas fa-credit-card"></i> PAN Card Verification</h3><i class="fas fa-chevron-down"></i></div>
-                <div id="panContent" class="dropdown-content">
-                    <input type="text" id="panNum" placeholder="PAN Number" required>
-                    <div class="file-group"><label>PAN Front</label><input type="file" id="panFrontDoc" accept="image/*"><img id="previewPanFront" class="image-preview" style="display:none;"></div>
-                    <div class="file-group"><label>PAN Back</label><input type="file" id="panBackDoc" accept="image/*"><img id="previewPanBack" class="image-preview" style="display:none;"></div>
-                    <div class="file-group"><label>PAN Front Selfie</label><input type="file" id="panFrontSelfie" accept="image/*"><img id="previewPanFrontSelfie" class="image-preview" style="display:none;"></div>
-                    <div class="file-group"><label>PAN Back Selfie</label><input type="file" id="panBackSelfie" accept="image/*"><img id="previewPanBackSelfie" class="image-preview" style="display:none;"></div>
-                </div>
-            </div>
-            <div class="kyc-card">
-                <h3><i class="fas fa-camera"></i> HD Profile Picture</h3>
-                <div class="file-group"><label>High Resolution Photo</label><input type="file" id="hdProfilePic" accept="image/*"><img id="previewHd" class="image-preview" style="display:none;"></div>
-            </div>
-            <button type="button" id="submitModernKyc">Submit All Documents</button>
-        </form>`;
+        return `<h2>📄 Complete KYC</h2>
+        <div class="kyc-card"><div class="dropdown-header" data-dropdown="aadhaar"><h3>Aadhaar</h3><i class="fas fa-chevron-down"></i></div><div id="aadhaarContent" class="dropdown-content"><input id="aadhaarNum" placeholder="Aadhaar Number"><div class="file-group"><label>Front</label><input type="file" id="aadFrontDoc"><img id="previewAadFront" class="image-preview"></div><div class="file-group"><label>Back</label><input type="file" id="aadBackDoc"><img id="previewAadBack" class="image-preview"></div><div class="file-group"><label>Front Selfie</label><input type="file" id="aadFrontSelfie"><img id="previewAadFrontSelfie" class="image-preview"></div><div class="file-group"><label>Back Selfie</label><input type="file" id="aadBackSelfie"><img id="previewAadBackSelfie" class="image-preview"></div></div></div>
+        <div class="kyc-card"><div class="dropdown-header" data-dropdown="pan"><h3>PAN</h3><i class="fas fa-chevron-down"></i></div><div id="panContent" class="dropdown-content"><input id="panNum" placeholder="PAN Number"><div class="file-group"><label>Front</label><input type="file" id="panFrontDoc"><img id="previewPanFront" class="image-preview"></div><div class="file-group"><label>Back</label><input type="file" id="panBackDoc"><img id="previewPanBack" class="image-preview"></div><div class="file-group"><label>Front Selfie</label><input type="file" id="panFrontSelfie"><img id="previewPanFrontSelfie" class="image-preview"></div><div class="file-group"><label>Back Selfie</label><input type="file" id="panBackSelfie"><img id="previewPanBackSelfie" class="image-preview"></div></div></div>
+        <div class="kyc-card"><h3>HD Profile Picture</h3><div class="file-group"><input type="file" id="hdProfilePic"><img id="previewHd" class="image-preview"></div></div>
+        <button id="submitKycBtn">Submit KYC</button>`;
     }
 
-    async function uploadFile(file, baseName){
+    async function uploadFile(file, baseName) {
         if(!file) return null;
-        const timestamp = Date.now();
-        const ext = file.name.split('.').pop();
-        const fileName = `${baseName}_${timestamp}.${ext}`;
-        const fullPath = `${currentUser.id}/kyc/${fileName}`;
-        const { data, error } = await supabase.storage.from('kyc_docs').upload(fullPath, file, { upsert: false });
+        const path = `${currentUser.id}/kyc/${baseName}_${Date.now()}.${file.name.split('.').pop()}`;
+        const { data, error } = await supabase.storage.from('kyc_docs').upload(path, file);
         if(error) throw error;
-        return fullPath;
+        return path;
     }
 
-    async function submitModernKyc(){
-        // same as previous
-        const aadhaarNum = document.getElementById('aadhaarNum').value;
-        const panNum = document.getElementById('panNum').value;
+    async function submitKyc() {
+        const aadhaarNum = document.getElementById('aadhaarNum')?.value;
+        const panNum = document.getElementById('panNum')?.value;
+        const files = {
+            aadFront: document.getElementById('aadFrontDoc')?.files[0],
+            aadBack: document.getElementById('aadBackDoc')?.files[0],
+            aadFrontSelfie: document.getElementById('aadFrontSelfie')?.files[0],
+            aadBackSelfie: document.getElementById('aadBackSelfie')?.files[0],
+            panFront: document.getElementById('panFrontDoc')?.files[0],
+            panBack: document.getElementById('panBackDoc')?.files[0],
+            panFrontSelfie: document.getElementById('panFrontSelfie')?.files[0],
+            panBackSelfie: document.getElementById('panBackSelfie')?.files[0],
+            hd: document.getElementById('hdProfilePic')?.files[0]
+        };
         if(!aadhaarNum || !panNum) return toast("Aadhaar and PAN numbers required","error");
-        const aadFrontDoc = document.getElementById('aadFrontDoc').files[0];
-        const aadBackDoc = document.getElementById('aadBackDoc').files[0];
-        const aadFrontSelfie = document.getElementById('aadFrontSelfie').files[0];
-        const aadBackSelfie = document.getElementById('aadBackSelfie').files[0];
-        const panFrontDoc = document.getElementById('panFrontDoc').files[0];
-        const panBackDoc = document.getElementById('panBackDoc').files[0];
-        const panFrontSelfie = document.getElementById('panFrontSelfie').files[0];
-        const panBackSelfie = document.getElementById('panBackSelfie').files[0];
-        const hdPic = document.getElementById('hdProfilePic').files[0];
-        if(!aadFrontDoc||!aadBackDoc||!aadFrontSelfie||!aadBackSelfie) return toast("All Aadhaar images required","error");
-        if(!panFrontDoc||!panFrontSelfie) return toast("PAN front document and selfie required","error");
-        if(!hdPic) return toast("HD profile picture required","error");
-        toast("Uploading...","info");
         try {
-            const aadFrontUrl = await uploadFile(aadFrontDoc, 'aad_front_doc');
-            const aadBackUrl = await uploadFile(aadBackDoc, 'aad_back_doc');
-            const aadFrontSelfieUrl = await uploadFile(aadFrontSelfie, 'aad_front_selfie');
-            const aadBackSelfieUrl = await uploadFile(aadBackSelfie, 'aad_back_selfie');
-            const panFrontUrl = await uploadFile(panFrontDoc, 'pan_front_doc');
-            const panBackUrl = panBackDoc ? await uploadFile(panBackDoc, 'pan_back_doc') : null;
-            const panFrontSelfieUrl = await uploadFile(panFrontSelfie, 'pan_front_selfie');
-            const panBackSelfieUrl = panBackSelfie ? await uploadFile(panBackSelfie, 'pan_back_selfie') : null;
-            const hdUrl = await uploadFile(hdPic, 'hd_profile');
-            const { error } = await supabase.from('verifications').insert({
-                uid: currentUser.id,
-                full_name: userProfile.name,
-                aadhaar_number: aadhaarNum,
-                aadhaar_front: aadFrontUrl,
-                aadhaar_back: aadBackUrl,
-                aadhaar_front_selfie: aadFrontSelfieUrl,
-                aadhaar_back_selfie: aadBackSelfieUrl,
-                pan_number: panNum,
-                pan_front_doc: panFrontUrl,
-                pan_back_doc: panBackUrl,
-                pan_front_selfie: panFrontSelfieUrl,
-                pan_back_selfie: panBackSelfieUrl,
-                user_hd_pic: hdUrl,
-                status: 'pending',
-                submitted_at: new Date()
+            const urls = {};
+            for(const [key, file] of Object.entries(files)) if(file) urls[key] = await uploadFile(file, key);
+            await supabase.from('verifications').insert({
+                uid: currentUser.id, full_name: userProfile.name, aadhaar_number: aadhaarNum, pan_number: panNum,
+                aadhaar_front: urls.aadFront, aadhaar_back: urls.aadBack, aadhaar_front_selfie: urls.aadFrontSelfie, aadhaar_back_selfie: urls.aadBackSelfie,
+                pan_front_doc: urls.panFront, pan_back_doc: urls.panBack, pan_front_selfie: urls.panFrontSelfie, pan_back_selfie: urls.panBackSelfie,
+                user_hd_pic: urls.hd, status: 'pending'
             });
-            if(error) throw error;
-            toast("KYC submitted! Pending review.","success");
+            toast("KYC submitted!","success");
             renderPanel('kyc');
-        } catch(err) { toast("Upload failed: "+err.message, "error"); }
+        } catch(e) { toast("Upload failed: "+e.message,"error"); }
     }
 
-    // ---------- Withdrawal with payment methods ----------
-    async function renderWithdraw(){
+    // ---------- Withdraw ----------
+    async function renderWithdraw() {
         const { data: methods } = await supabase.from('payment_methods').select('*').eq('uid', currentUser.id);
-        return `
-        <h2>💸 Withdraw Funds</h2>
-        <div class="stats-grid"><div class="stat-card"><h4>Your Balance</h4><div class="value">₹${userProfile.balance||0}</div></div>
-        <div class="stat-card"><h4>Min Withdrawal</h4><div class="value">₹100</div></div></div>
-        <h3>Your Bank/UPI Accounts</h3>
-        <div id="paymentMethodsList">${methods?.length ? methods.map(m => `<div class="payment-method-card"><span class="payment-badge">${m.type.toUpperCase()}</span> ${m.type==='UPI'?m.details:JSON.parse(m.details).name}<button class="btn-sm deleteMethod" data-id="${m.id}">Delete</button></div>`).join('') : '<p>No payment methods. Click below to add.</p>'}</div>
-        <button id="addPaymentMethodBtn" class="btn-sm"><i class="fas fa-plus"></i> Add Bank / UPI</button>
-        <h3>Request Withdrawal</h3>
-        <form id="wdForm"><select id="wdMethodSelect" required>${methods?.map(m => `<option value="${m.id}">${m.type.toUpperCase()} - ${m.details}</option>`).join('')}</select><input type="number" id="wdAmount" placeholder="Amount (Min ₹100)" required><button type="submit">Request Withdrawal</button></form>`;
+        return `<h2>💸 Withdraw Funds</h2><div class="stats-grid"><div class="stat-card"><h4>Balance</h4><div class="value">₹${userProfile.balance||0}</div></div></div>
+        <h3>Payment Methods</h3><div id="methodsList">${methods?.map(m=>`<div class="payment-method-card"><span class="payment-badge">${m.type}</span> ${m.type==='UPI'?m.details:JSON.parse(m.details).name}<button class="btn-sm deleteMethod" data-id="${m.id}">Delete</button></div>`).join('')||'None'}</div>
+        <button id="addMethodBtn" class="btn-sm">+ Add Bank/UPI</button>
+        <h3>Request Withdrawal</h3><form id="wdForm"><select id="wdMethod">${methods?.map(m=>`<option value="${m.id}">${m.type} - ${m.details}</option>`).join('')}</select><input type="number" id="wdAmount" placeholder="Amount (Min ₹100)"><button type="submit">Withdraw</button></form>`;
     }
 
     async function addPaymentMethod() {
-        const { value: methodType } = await Swal.fire({ title:'Add Payment Method', input:'select', inputOptions:{'UPI':'UPI ID','bank':'Bank Account'}, showCancelButton:true });
-        if(!methodType) return;
-        if(methodType === 'UPI'){
-            const { value: upiId } = await Swal.fire({ title:'UPI ID', input:'text', inputPlaceholder:'username@bank' });
-            if(upiId) await supabase.from('payment_methods').insert({ uid:currentUser.id, type:'UPI', details:upiId });
+        const type = await Swal.fire({title:'Type', input:'select', inputOptions:{UPI:'UPI',bank:'Bank'}});
+        if(!type.value) return;
+        if(type.value === 'UPI') {
+            const { value: upi } = await Swal.fire({title:'UPI ID', input:'text'});
+            if(upi) await supabase.from('payment_methods').insert({ uid:currentUser.id, type:'UPI', details:upi });
         } else {
-            const { value: form } = await Swal.fire({ title:'Bank Account', html:`<input id="bankName" placeholder="Full Name"><input id="bankAccount" placeholder="Account Number"><input id="bankIfsc" placeholder="IFSC">`, preConfirm:()=>({ name:document.getElementById('bankName').value, account:document.getElementById('bankAccount').value, ifsc:document.getElementById('bankIfsc').value }) });
+            const { value: form } = await Swal.fire({title:'Bank Details', html:`<input id="bankName" placeholder="Full Name"><input id="bankAccount" placeholder="Account Number"><input id="bankIfsc" placeholder="IFSC">`, preConfirm:()=>({ name:document.getElementById('bankName').value, account:document.getElementById('bankAccount').value, ifsc:document.getElementById('bankIfsc').value })});
             if(form) await supabase.from('payment_methods').insert({ uid:currentUser.id, type:'bank', details:JSON.stringify(form) });
         }
         renderPanel('withdraw');
     }
-    async function deletePaymentMethod(id){ await supabase.from('payment_methods').delete().eq('id',id); renderPanel('withdraw'); }
-    async function requestWithdrawal(amount, methodId){
-        if(userProfile.verification_status !== 'verified'){
-            const { isConfirmed } = await Swal.fire({ title:'KYC Required', text:'Please complete KYC first.', icon:'warning', confirmButtonText:'Go to KYC', showCancelButton:true });
-            if(isConfirmed) setActiveTab('kyc');
-            return;
-        }
+
+    async function deletePaymentMethod(id) { await supabase.from('payment_methods').delete().eq('id',id); renderPanel('withdraw'); }
+    async function requestWithdrawal(amount, methodId) {
+        if(userProfile.verification_status !== 'verified') return toast("Complete KYC first","error");
         if(amount<100) return toast("Min ₹100","error");
         if(amount>userProfile.balance) return toast("Insufficient balance","error");
         const { data: method } = await supabase.from('payment_methods').select('*').eq('id', methodId).single();
         let details = method.details;
         if(method.type === 'bank'){ const d=JSON.parse(details); details = `${d.name}, A/c:${d.account}, IFSC:${d.ifsc}`; }
         await supabase.from('withdrawals').insert({ uid:currentUser.id, amount, method:method.type, details, status:'pending' });
-        toast("Withdrawal request sent!","success");
+        toast("Request sent!","success");
         renderPanel('withdraw');
     }
 
     // ---------- Chat ----------
-    async function renderChat(){
-        const { data: msgs } = await supabase.from('support_messages').select('*').or(`uid.eq.${currentUser.id},recipient_uid.eq.${currentUser.id}`).order('created_at', { ascending: true });
-        return `<h2>💬 Support Chat (Private)</h2><div class="chat-box">${msgs?.map(m=>`<div><strong>${m.is_admin?'Admin':'You'}:</strong> ${m.message}</div>`).join('')||'No messages'}</div><div style="display:flex;"><input type="text" id="userChatMsg"><button id="sendMsgBtn">Send</button></div>`;
+    async function renderChat() {
+        const { data: msgs } = await supabase.from('support_messages').select('*').or(`uid.eq.${currentUser.id},recipient_uid.eq.${currentUser.id}`).order('created_at');
+        return `<h2>💬 Support Chat</h2><div class="chat-box">${msgs?.map(m=>`<div><strong>${m.is_admin?'Admin':'You'}:</strong> ${m.message}</div>`).join('')||'No messages'}</div><div style="display:flex;"><input type="text" id="userChatMsg"><button id="sendMsgBtn">Send</button></div>`;
     }
 
     // ---------- Panel Controller ----------
     let currentTab = 'dashboard';
-    async function renderPanel(tab){
+    async function renderPanel(tab) {
         currentTab = tab;
-        const container = document.getElementById('userMainPanel');
+        const container = document.getElementById('dashboardMain');
         if(tab === 'dashboard') container.innerHTML = await renderDashboard();
         else if(tab === 'tasks') { container.innerHTML = await renderTasks(); initCountdowns(); attachTaskEvents(); }
         else if(tab === 'referrals') container.innerHTML = await renderReferrals();
@@ -535,40 +401,114 @@
         attachCommonEvents();
     }
 
-    function attachCommonEvents(){
+    function attachCommonEvents() {
         document.getElementById('copyCodeBtn')?.addEventListener('click',()=>{ navigator.clipboard.writeText(userProfile.referral_code); toast("Code copied!"); });
         document.getElementById('copyLinkBtn')?.addEventListener('click',()=>{ let l=`${location.origin}${location.pathname}?ref=${userProfile.referral_code}`; navigator.clipboard.writeText(l); toast("Link copied"); });
         document.getElementById('copyFullLinkBtn')?.addEventListener('click',()=>{ let l=`${location.origin}${location.pathname}?ref=${userProfile.referral_code}`; navigator.clipboard.writeText(l); toast("Link copied"); });
-        document.getElementById('submitModernKyc')?.addEventListener('click',submitModernKyc);
-        document.getElementById('addPaymentMethodBtn')?.addEventListener('click',addPaymentMethod);
-        document.querySelectorAll('.deleteMethod').forEach(btn=>btn.addEventListener('click',()=>deletePaymentMethod(btn.dataset.id)));
-        document.getElementById('wdForm')?.addEventListener('submit', async(e)=>{ e.preventDefault(); const methodId = document.getElementById('wdMethodSelect').value; const amount = parseInt(document.getElementById('wdAmount').value); await requestWithdrawal(amount, methodId); });
+        document.getElementById('submitKycBtn')?.addEventListener('click',submitKyc);
+        document.getElementById('addMethodBtn')?.addEventListener('click',addPaymentMethod);
+        document.querySelectorAll('.deleteMethod').forEach(btn=>btn.addEventListener('click',async()=>{ await supabase.from('payment_methods').delete().eq('id',btn.dataset.id); renderPanel('withdraw'); }));
+        document.getElementById('wdForm')?.addEventListener('submit',async(e)=>{ e.preventDefault(); const methodId = document.getElementById('wdMethod').value; const amount = parseInt(document.getElementById('wdAmount').value); await requestWithdrawal(amount, methodId); });
         document.getElementById('sendMsgBtn')?.addEventListener('click',async()=>{ let msg=document.getElementById('userChatMsg').value; if(msg){ await supabase.from('support_messages').insert({ uid:currentUser.id, message:msg, is_admin:false }); document.getElementById('userChatMsg').value=''; renderPanel('chat'); } });
-        // KYC previews
-        const preview = (fileId, previewId) => { const inp = document.getElementById(fileId); if(inp) inp.addEventListener('change',(e)=>{ if(e.target.files[0]){ const reader = new FileReader(); reader.onload = ev => { document.getElementById(previewId).src = ev.target.result; document.getElementById(previewId).style.display='block'; }; reader.readAsDataURL(e.target.files[0]); } }); };
+        const preview = (id, previewId) => { const inp = document.getElementById(id); if(inp) inp.addEventListener('change',(e)=>{ if(e.target.files[0]){ const reader = new FileReader(); reader.onload = ev => { const img = document.getElementById(previewId); if(img) { img.src = ev.target.result; img.style.display='block'; } }; reader.readAsDataURL(e.target.files[0]); } }); };
         preview('aadFrontDoc','previewAadFront'); preview('aadBackDoc','previewAadBack'); preview('aadFrontSelfie','previewAadFrontSelfie'); preview('aadBackSelfie','previewAadBackSelfie');
         preview('panFrontDoc','previewPanFront'); preview('panBackDoc','previewPanBack'); preview('panFrontSelfie','previewPanFrontSelfie'); preview('panBackSelfie','previewPanBackSelfie'); preview('hdProfilePic','previewHd');
+        document.querySelectorAll('.dropdown-header').forEach(h=>{ h.addEventListener('click',()=>{ const cont = document.getElementById(h.getAttribute('data-dropdown')+'Content'); cont.classList.toggle('open'); const icon = h.querySelector('i'); if(cont.classList.contains('open')) icon.classList.replace('fa-chevron-down','fa-chevron-up'); else icon.classList.replace('fa-chevron-up','fa-chevron-down'); }); });
     }
 
-    function showAuthModal(){
-        Swal.fire({ title:'GameLoot', html:`<input id="authEmail" placeholder="Email"><input id="authPass" type="password" placeholder="Password"><select id="authMode"><option value="login">Login</option><option value="signup">Sign Up</option></select>`, preConfirm:()=>({ email:document.getElementById('authEmail').value, pass:document.getElementById('authPass').value, mode:document.getElementById('authMode').value }) }).then(async(r)=>{
-            if(r.value.mode==='signup'){ const{error}=await supabase.auth.signUp({ email:r.value.email, password:r.value.pass }); if(error) toast(error.message,"error"); else toast("Check email to verify","info"); }
-            else{ const{error}=await supabase.auth.signInWithPassword({ email:r.value.email, password:r.value.pass }); if(error) toast(error.message,"error"); else location.reload(); }
+    function renderFullDashboard() {
+        return `
+        <div class="dashboard-container">
+            <div class="sidebar">
+                <div class="logo">🎮 GAMELOOT</div>
+                <div class="nav-item active" data-tab="dashboard"><i class="fas fa-home"></i><span>Dashboard</span></div>
+                <div class="nav-item" data-tab="tasks"><i class="fas fa-tasks"></i><span>Earn Tasks</span></div>
+                <div class="nav-item" data-tab="referrals"><i class="fas fa-user-plus"></i><span>Referrals</span></div>
+                <div class="nav-item" data-tab="kyc"><i class="fas fa-id-card"></i><span>KYC</span></div>
+                <div class="nav-item" data-tab="withdraw"><i class="fas fa-rupee-sign"></i><span>Withdraw</span></div>
+                <div class="nav-item" data-tab="chat"><i class="fas fa-headset"></i><span>Support</span></div>
+                <div class="nav-item" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></div>
+            </div>
+            <div class="main-panel" id="dashboardMain"></div>
+        </div>
+        <div class="bottom-nav">
+            <div class="bottom-nav-item active" data-tab="dashboard"><i class="fas fa-home"></i><span>Home</span></div>
+            <div class="bottom-nav-item" data-tab="tasks"><i class="fas fa-tasks"></i><span>Tasks</span></div>
+            <div class="bottom-nav-item" data-tab="referrals"><i class="fas fa-user-plus"></i><span>Refer</span></div>
+            <div class="bottom-nav-item" data-tab="kyc"><i class="fas fa-id-card"></i><span>KYC</span></div>
+            <div class="bottom-nav-item" data-tab="withdraw"><i class="fas fa-rupee-sign"></i><span>Withdraw</span></div>
+            <div class="bottom-nav-item" data-tab="chat"><i class="fas fa-headset"></i><span>Chat</span></div>
+        </div>`;
+    }
+
+    function initDashboard() {
+        const root = document.getElementById('root');
+        root.innerHTML = renderFullDashboard();
+        renderPanel('dashboard');
+        document.querySelectorAll('.nav-item[data-tab], .bottom-nav-item[data-tab]').forEach(el => {
+            el.addEventListener('click', () => {
+                const tab = el.getAttribute('data-tab');
+                document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(n => n.classList.remove('active'));
+                document.querySelectorAll(`.nav-item[data-tab="${tab}"], .bottom-nav-item[data-tab="${tab}"]`).forEach(n => n.classList.add('active'));
+                renderPanel(tab);
+            });
         });
+        document.getElementById('logoutBtn')?.addEventListener('click', async () => { await supabase.auth.signOut(); location.reload(); });
     }
 
-    function setActiveTab(tabId){
-        document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll(`.nav-item[data-tab="${tabId}"], .bottom-nav-item[data-tab="${tabId}"]`).forEach(el => el.classList.add('active'));
-        renderPanel(tabId);
+    function renderHeroPage() {
+        return `
+        <div class="top-bar">
+            <div class="logo">🎮 GAMELOOT</div>
+            <div class="auth-buttons">
+                <button id="heroSignInBtn" class="btn-outline">Sign In</button>
+                <button id="heroSignUpBtn" class="btn-primary">Sign Up</button>
+            </div>
+        </div>
+        <div class="hero">
+            <h1>Work Small, Earn Big</h1>
+            <p>Complete simple tasks, get rewarded instantly. Join thousands earning daily with GameLoot.</p>
+            <div class="hero-buttons">
+                <button id="heroGetStarted" class="btn-primary">Get Started →</button>
+                <button id="heroLoginBtn" class="btn-outline">I already have an account</button>
+            </div>
+            <div class="feature-cards">
+                <div class="feature-card"><i class="fas fa-tasks"></i><h3>Micro Tasks</h3><p>Earn ₹10–500 per task</p></div>
+                <div class="feature-card"><i class="fas fa-wallet"></i><h3>Fast Withdrawals</h3><p>UPI, Bank, Crypto</p></div>
+                <div class="feature-card"><i class="fas fa-users"></i><h3>Referral Bonuses</h3><p>₹50 + 10% commission</p></div>
+            </div>
+        </div>`;
     }
 
-    document.querySelectorAll('.nav-item[data-tab], .bottom-nav-item[data-tab]').forEach(el => {
-        el.addEventListener('click', (e) => { const tab = el.getAttribute('data-tab'); if(tab) setActiveTab(tab); });
-    });
-    document.getElementById('userLogoutBtn').addEventListener('click',async()=>{ await supabase.auth.signOut(); location.reload(); });
-    checkAuth();
-})();
+    async function init() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if(!user) {
+            const root = document.getElementById('root');
+            root.innerHTML = renderHeroPage();
+            document.getElementById('heroSignUpBtn')?.addEventListener('click', showSignUpModal);
+            document.getElementById('heroGetStarted')?.addEventListener('click', showSignUpModal);
+            document.getElementById('heroSignInBtn')?.addEventListener('click', showSignInModal);
+            document.getElementById('heroLoginBtn')?.addEventListener('click', showSignInModal);
+            return;
+        }
+        currentUser = user;
+        if(!user.email_confirmed_at) {
+            const root = document.getElementById('root');
+            root.innerHTML = `<div class="hero"><h2>Email not verified</h2><p>Please check your inbox and click the verification link.</p><button id="resendBtn" class="btn-primary">Resend verification email</button></div>`;
+            document.getElementById('resendBtn')?.addEventListener('click', async () => { const { error } = await supabase.auth.resend({ type: 'signup', email: user.email }); if(error) toast(error.message,"error"); else toast("Verification email resent!","success"); });
+            return;
+        }
+        try {
+            userProfile = await ensureProfile(user.id, user.email, user.user_metadata?.name);
+            const ref = new URLSearchParams(window.location.search).get('ref');
+            if(ref && !userProfile.referred_by) {
+                await supabase.from('profiles').update({ referred_by: ref }).eq('id', user.id);
+                toast("Referral code applied!","success");
+            }
+            initDashboard();
+        } catch(err) { toast("Error loading profile","error"); console.error(err); }
+    }
+    init();
 </script>
 </body>
 </html>
