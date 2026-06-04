@@ -9,7 +9,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* (same base styles as previous admin.html – keep unchanged) */
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
         body{background:#0a0c12;color:#eef2ff;}
         .admin-container{display:flex;min-height:100vh;}
@@ -43,6 +42,8 @@
         .leaderboard-card { background:#0f172a; border-radius:24px; padding:1rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; }
         .rank { font-size:1.5rem; font-weight:bold; color:#00f2fe; width:50px; }
         .fraud-warning { background:#7f1a1a; border-radius:16px; padding:0.5rem; margin-top:0.5rem; color:#ffaaaa; }
+        .field-builder { background:#0f1222; padding:1rem; border-radius:16px; margin-top:1rem; }
+        .field-item { background:#1a1e2e; padding:0.8rem; margin:0.5rem 0; border-radius:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     </style>
 </head>
 <body>
@@ -111,66 +112,85 @@
         </div>`;
     }
 
+    // ==================== TASK MANAGEMENT (FULLY FIXED) ====================
     async function renderTasks(){
         const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
         return `<div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
-        <tr><thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Custom Fields</th><th>Actions</th></tr></thead><tbody>
-        ${tasks?.map(t => `<tr>
-            <td>${t.title}</td>
-            <td>₹${t.reward}</td>
-            <td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td>
-            <td>${t.custom_fields?.length || 0}</td>
-            <td><button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button><button class="btn-sm deleteTask" data-id="${t.id}">Delete</button></td>
-        </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
-        </tbody></table>`;
+        <div class="table-responsive">
+        <table><thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Fields</th><th>Actions</th></tr></thead><tbody>
+        ${tasks?.map(t => `
+            <tr>
+                <td>${escapeHtml(t.title)}</td>
+                <td>₹${t.reward}</td>
+                <td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td>
+                <td>${t.custom_fields?.length || 0}</td>
+                <td class="flex-btns">
+                    <button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button>
+                    <button class="btn-sm btn-reject deleteTask" data-id="${t.id}">Delete</button>
+                </td>
+            </tr>
+        `).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
+        </tbody><table>
+        </div>`;
     }
+
+    function escapeHtml(str) { return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
 
     function showTaskModal(task = null){
         let customFields = task ? task.custom_fields || [] : [];
+        window.tempFields = [...customFields];
+        
         Swal.fire({
             title: task ? 'Edit Task' : 'New Task',
             html: `
-                <input id="taskTitle" value="${task?.title || ''}" placeholder="Task Title">
-                <textarea id="taskDesc" placeholder="Description">${task?.description || ''}</textarea>
-                <input id="taskReward" value="${task?.reward || ''}" placeholder="Reward Amount">
-                <input id="taskLink" value="${task?.link || ''}" placeholder="Task URL">
-                <textarea id="helpText" placeholder="Help text (HTML allowed)">${task?.help_text || ''}</textarea>
-                <input id="deadline" type="datetime-local" value="${task?.deadline ? new Date(task.deadline).toISOString().slice(0,16) : ''}" placeholder="Deadline (optional)">
-                <div id="customFieldsContainer" style="background:#0f1222; padding:1rem; border-radius:16px;">
-                    <h4>Custom Fields</h4>
+                <input id="taskTitle" value="${task?.title || ''}" placeholder="Task Title" class="swal2-input">
+                <textarea id="taskDesc" placeholder="Description" class="swal2-textarea">${task?.description || ''}</textarea>
+                <input id="taskReward" value="${task?.reward || ''}" placeholder="Reward Amount (₹)" class="swal2-input">
+                <input id="taskLink" value="${task?.link || ''}" placeholder="Task URL (https://...)" class="swal2-input">
+                <textarea id="helpText" placeholder="Help text (HTML allowed – images, links, etc.)" class="swal2-textarea">${task?.help_text || ''}</textarea>
+                <input id="deadline" type="datetime-local" value="${task?.deadline ? new Date(task.deadline).toISOString().slice(0,16) : ''}" class="swal2-input">
+                <div class="field-builder">
+                    <h4>Custom Fields (user must fill when completing task)</h4>
                     <div id="fieldsList"></div>
                     <button type="button" id="addFieldBtn" class="btn-sm">+ Add Field</button>
                 </div>
             `,
             focusConfirm: false,
+            width: '800px',
             preConfirm: () => {
-                const title = document.getElementById('taskTitle').value;
+                const title = document.getElementById('taskTitle').value.trim();
                 const description = document.getElementById('taskDesc').value;
                 const reward = parseInt(document.getElementById('taskReward').value);
-                const link = document.getElementById('taskLink').value;
+                const link = document.getElementById('taskLink').value.trim();
                 const help_text = document.getElementById('helpText').value;
                 const deadline = document.getElementById('deadline').value ? new Date(document.getElementById('deadline').value).toISOString() : null;
                 const fields = window.tempFields || [];
-                if(!title || !reward) Swal.showValidationMessage('Title and reward required');
-                return { title, description, reward, link, help_text, deadline, custom_fields: fields };
+                if(!title) Swal.showValidationMessage('Title required');
+                else if(isNaN(reward) || reward <= 0) Swal.showValidationMessage('Valid reward amount required');
+                else if(!link) Swal.showValidationMessage('Task URL required');
+                else return { title, description, reward, link, help_text, deadline, custom_fields: fields };
             },
             didOpen: () => {
-                window.tempFields = [...customFields];
                 renderFieldsList();
-                document.getElementById('addFieldBtn').addEventListener('click', () => {
-                    addFieldModal().then(field => { if(field) { window.tempFields.push(field); renderFieldsList(); } });
+                document.getElementById('addFieldBtn').addEventListener('click', async () => {
+                    const newField = await addFieldModal();
+                    if(newField) {
+                        window.tempFields.push(newField);
+                        renderFieldsList();
+                    }
                 });
-            },
-            width: '800px'
-        }).then(async (res) => {
-            if(res.value){
-                const data = res.value;
+            }
+        }).then(async (result) => {
+            if(result.value){
+                const data = result.value;
                 if(task){
-                    await supabase.from('tasks').update(data).eq('id', task.id);
-                    Swal.fire("Updated", "", "success");
+                    const { error } = await supabase.from('tasks').update(data).eq('id', task.id);
+                    if(error) Swal.fire("Error", error.message, "error");
+                    else Swal.fire("Updated", "Task updated successfully", "success");
                 } else {
-                    await supabase.from('tasks').insert({ ...data, created_at: new Date() });
-                    Swal.fire("Task added", "", "success");
+                    const { error } = await supabase.from('tasks').insert({ ...data, created_at: new Date() });
+                    if(error) Swal.fire("Error", error.message, "error");
+                    else Swal.fire("Added", "Task added successfully", "success");
                 }
                 loadTab('tasks');
             }
@@ -181,15 +201,15 @@
         const container = document.getElementById('fieldsList');
         if(!container) return;
         container.innerHTML = window.tempFields.map((f, idx) => `
-            <div style="background:#1a1e2e; padding:0.8rem; margin:0.5rem 0; border-radius:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                <input type="text" value="${f.label}" placeholder="Label" onchange="window.tempFields[${idx}].label = this.value">
-                <select onchange="window.tempFields[${idx}].type = this.value">
+            <div class="field-item">
+                <input type="text" value="${f.label}" placeholder="Field Label" style="flex:2;" onchange="window.tempFields[${idx}].label = this.value">
+                <select onchange="window.tempFields[${idx}].type = this.value" style="flex:1;">
                     <option value="text" ${f.type==='text'?'selected':''}>Text</option>
                     <option value="email" ${f.type==='email'?'selected':''}>Email</option>
                     <option value="number" ${f.type==='number'?'selected':''}>Number</option>
                     <option value="file" ${f.type==='file'?'selected':''}>File Upload</option>
                 </select>
-                <label><input type="checkbox" ${f.required ? 'checked' : ''} onchange="window.tempFields[${idx}].required = this.checked"> Required</label>
+                <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" ${f.required ? 'checked' : ''} onchange="window.tempFields[${idx}].required = this.checked"> Required</label>
                 <button class="btn-sm" onclick="window.tempFields.splice(${idx},1); renderFieldsList()">Remove</button>
             </div>
         `).join('');
@@ -198,13 +218,26 @@
     async function addFieldModal(){
         const { value: field } = await Swal.fire({
             title: 'Add Custom Field',
-            html: `<input id="fieldLabel" placeholder="Field Label"><select id="fieldType"><option value="text">Text</option><option value="email">Email</option><option value="number">Number</option><option value="file">File Upload</option></select><label><input type="checkbox" id="fieldRequired"> Required</label>`,
-            preConfirm: () => ({ label: document.getElementById('fieldLabel').value, type: document.getElementById('fieldType').value, required: document.getElementById('fieldRequired').checked })
+            html: `<input id="fieldLabel" placeholder="Field Label" class="swal2-input">
+                   <select id="fieldType" class="swal2-select">
+                       <option value="text">Text</option>
+                       <option value="email">Email</option>
+                       <option value="number">Number</option>
+                       <option value="file">File Upload</option>
+                   </select>
+                   <label><input type="checkbox" id="fieldRequired"> Required</label>`,
+            preConfirm: () => {
+                const label = document.getElementById('fieldLabel').value.trim();
+                const type = document.getElementById('fieldType').value;
+                const required = document.getElementById('fieldRequired').checked;
+                if(!label) Swal.showValidationMessage('Label is required');
+                else return { label, type, required };
+            }
         });
-        if(field && field.label) return field;
-        return null;
+        return field;
     }
 
+    // ==================== SUBMISSIONS ====================
     async function renderSubmissions(){
         const { data: subs } = await supabase.from('submissions').select('*, tasks(title, custom_fields), profiles(name)').eq('status', 'pending');
         if(!subs?.length) return `<h2 class="section-title">Pending Submissions</h2><p>No pending submissions.</p>`;
@@ -238,6 +271,7 @@
         return html;
     }
 
+    // ==================== KYC ====================
     async function renderKyc(){
         const { data: kycList } = await supabase.from('verifications').select('*').eq('status', 'pending');
         if(!kycList?.length) return `<h2 class="section-title">KYC Reviews</h2><p>No pending KYC requests.</p>`;
@@ -261,6 +295,7 @@
         return html;
     }
 
+    // ==================== USERS ====================
     async function renderUsers(){
         const { data: users } = await supabase.from('profiles').select('*');
         return `<h2 class="section-title">User Management</h2>
@@ -280,10 +315,11 @@
         </tbody></table>`;
     }
 
+    // ==================== WITHDRAWALS ====================
     async function renderWithdrawals(){
         const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Withdrawals</h2>
-        </table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
+        <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
         ${wd?.map(w => `<tr>
             <td>${w.profiles?.name}</td>
             <td>₹${w.amount}</td>
@@ -291,10 +327,11 @@
             <td>${w.details}</td>
             <td><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
             <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
-        </tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
+        </tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td><tr>'}
         </tbody></table>`;
     }
 
+    // ==================== LEADERBOARD ====================
     async function renderLeaderboard(){
         const { data: users } = await supabase.from('profiles').select('id, name, email, balance, referral_earnings, total_earnings').order('total_earnings', { ascending: false }).limit(20);
         return `<h2 class="section-title">🏆 Top Earners Leaderboard</h2>
@@ -307,7 +344,7 @@
         `).join('') || '<p>No users yet.</p>'}</div>`;
     }
 
-    // ---------- Auto Fraud Scoring Function ----------
+    // ==================== FRAUD DETECTION ====================
     async function calculateFraudScore(userId, userData, allActivities) {
         let score = 0;
         const userActivity = allActivities.find(a => a.uid === userId);
@@ -316,40 +353,29 @@
         const fingerprint = userActivity.device_fingerprint;
         const signupTime = new Date(userActivity.created_at);
         
-        // Count occurrences of same IP across all users
         const sameIPCount = allActivities.filter(a => a.signup_ip === signupIP && a.signup_ip).length;
-        if (sameIPCount > 1) score += (sameIPCount - 1) * 10; // +10 per extra account
+        if (sameIPCount > 1) score += (sameIPCount - 1) * 10;
         
-        // Same device fingerprint
         const sameFingerprintCount = allActivities.filter(a => a.device_fingerprint === fingerprint && a.device_fingerprint).length;
         if (sameFingerprintCount > 1) score += (sameFingerprintCount - 1) * 15;
         
-        // Rapid registrations from same IP within 10 minutes
         const sameIPActivities = allActivities.filter(a => a.signup_ip === signupIP && a.created_at);
         for (let i = 0; i < sameIPActivities.length; i++) {
             const otherTime = new Date(sameIPActivities[i].created_at);
             const diffMinutes = Math.abs((signupTime - otherTime) / 60000);
             if (diffMinutes > 0 && diffMinutes < 10) {
                 score += 20;
-                break; // once detected, add once
+                break;
             }
         }
-        
-        // Suspicious IP change (last login IP different from signup IP)
-        if (userActivity.last_login_ip && userActivity.last_login_ip !== signupIP) {
-            score += 5;
-        }
-        
-        // Cap at 100 for readability
+        if (userActivity.last_login_ip && userActivity.last_login_ip !== signupIP) score += 5;
         return Math.min(score, 100);
     }
 
     async function renderFraud(){
-        // Fetch all users and all user_activity
         const { data: users } = await supabase.from('profiles').select('id, name, email, fraud_score, account_status, last_login_at, created_at');
         const { data: activities } = await supabase.from('user_activity').select('*');
         if (!users || users.length === 0) return `<h2 class="section-title">🛡️ Fraud Detection</h2><p>No users yet.</p>`;
-        
         let html = `<h2 class="section-title">🛡️ Fraud Detection & Risk Assessment</h2>
         <p><i>System automatically calculates additional fraud points based on IP sharing, same device, rapid registrations, and IP changes. Scores > 50 suggest suspension.</i></p>`;
         for(const u of users){
@@ -377,6 +403,7 @@
         return html;
     }
 
+    // ==================== CHAT ====================
     async function renderChat(){
         const { data: users } = await supabase.from('profiles').select('id, name, email');
         let selectedUserId = localStorage.getItem('selectedChatUserId') || (users?.[0]?.id || '');
