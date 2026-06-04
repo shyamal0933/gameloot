@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GameLoot Admin | Full Control</title>
+    <title>GameLoot Admin | Advanced Task Manager</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* (same base styles – keep as before) */
+        /* (same base styles as previous admin.html, kept concise) */
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
         body{background:#0a0c12;color:#eef2ff;}
         .admin-container{display:flex;min-height:100vh;}
@@ -37,10 +37,10 @@
         .kyc-review-card{background:#0f172a;border-radius:24px;padding:1.2rem;margin-bottom:1.2rem;border:1px solid #2a3a5a;}
         .kyc-images-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:15px 0;}
         .kyc-image{background:#00000040;border-radius:16px;padding:8px;text-align:center;}
-        .kyc-image img{max-width:100%;max-height:120px;border-radius:12px;cursor:pointer;background:#000;object-fit:contain;}
+        .kyc-image img{max-width:100%;max-height:120px;border-radius:12px;cursor:pointer;}
         .debug-info{background:#1e1e2e;border-radius:16px;padding:8px;margin-top:10px;font-size:11px;font-family:monospace;word-break:break-all;}
-        .modal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-card { background: #111827; border-radius: 32px; max-width: 800px; width: 90%; max-height: 90%; overflow-y: auto; padding: 2rem; border: 1px solid cyan; }
+        .field-builder { background:#0f1222; border-radius:20px; padding:1rem; margin:1rem 0; }
+        .field-item { background:#1a1e2e; padding:0.8rem; margin:0.5rem 0; border-radius:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     </style>
 </head>
 <body>
@@ -58,6 +58,7 @@
     </div>
     <div class="main-content" id="adminMain"></div>
 </div>
+
 <script>
 (function(){
     const SUPABASE_URL = "https://kyvtlfatjtbpwemwtqof.supabase.co";
@@ -65,7 +66,10 @@
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let currentAdmin = null;
 
-    async function getSignedUrl(path, expiresIn = 3600) { /* same as before */ if (!path) return null; try { const { data, error } = await supabase.storage.from('kyc_docs').createSignedUrl(path, expiresIn); if (error) return null; return data.signedUrl; } catch(e) { return null; } }
+    async function getSignedUrl(path, expiresIn = 3600) {
+        if (!path) return null;
+        try { const { data, error } = await supabase.storage.from('kyc_docs').createSignedUrl(path, expiresIn); if (error) return null; return data.signedUrl; } catch(e){ return null; }
+    }
 
     async function checkAdminAuth(){
         const { data: { user } } = await supabase.auth.getUser();
@@ -106,25 +110,120 @@
     async function renderTasks(){
         const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
         return `<div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
-        <table><thead><tr><th>Title</th><th>Reward</th><th>Category</th><th>Link</th><th>Actions</th></tr></thead><tbody>
+        <table><thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Custom Fields</th><th>Actions</th></tr></thead><tbody>
         ${tasks?.map(t => `<tr>
             <td>${t.title}</td>
             <td>₹${t.reward}</td>
-            <td>${t.category}</td>
-            <td><a href="${t.link}" target="_blank">Link</a></td>
-            <td><button class="btn-sm deleteTask" data-id="${t.id}">Delete</button></td>
+            <td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td>
+            <td>${t.custom_fields?.length || 0} fields</td>
+            <td><button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button><button class="btn-sm deleteTask" data-id="${t.id}">Delete</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
         </tbody></table>`;
+    }
+
+    function showTaskModal(task = null){
+        let customFields = task ? task.custom_fields || [] : [];
+        Swal.fire({
+            title: task ? 'Edit Task' : 'New Task',
+            html: `
+                <input id="taskTitle" value="${task?.title || ''}" placeholder="Task Title">
+                <textarea id="taskDesc" placeholder="Description">${task?.description || ''}</textarea>
+                <input id="taskReward" value="${task?.reward || ''}" placeholder="Reward Amount">
+                <input id="taskLink" value="${task?.link || ''}" placeholder="Task URL">
+                <textarea id="helpText" placeholder="Help text (HTML or image URLs allowed)">${task?.help_text || ''}</textarea>
+                <input id="deadline" type="datetime-local" value="${task?.deadline ? new Date(task.deadline).toISOString().slice(0,16) : ''}" placeholder="Deadline (optional)">
+                <div id="customFieldsContainer" class="field-builder">
+                    <h4>Custom Fields (user must fill)</h4>
+                    <div id="fieldsList"></div>
+                    <button type="button" id="addFieldBtn" class="btn-sm">+ Add Field</button>
+                </div>
+            `,
+            focusConfirm: false,
+            preConfirm: () => {
+                const title = document.getElementById('taskTitle').value;
+                const description = document.getElementById('taskDesc').value;
+                const reward = parseInt(document.getElementById('taskReward').value);
+                const link = document.getElementById('taskLink').value;
+                const help_text = document.getElementById('helpText').value;
+                const deadline = document.getElementById('deadline').value ? new Date(document.getElementById('deadline').value).toISOString() : null;
+                const fields = window.tempFields || [];
+                if(!title || !reward) Swal.showValidationMessage('Title and reward required');
+                return { title, description, reward, link, help_text, deadline, custom_fields: fields };
+            },
+            didOpen: () => {
+                window.tempFields = [...customFields];
+                renderFieldsList();
+                document.getElementById('addFieldBtn').addEventListener('click', () => {
+                    addFieldModal().then(field => { if(field) { window.tempFields.push(field); renderFieldsList(); } });
+                });
+            },
+            width: '800px'
+        }).then(async (res) => {
+            if(res.value){
+                const data = res.value;
+                if(task){
+                    const { error } = await supabase.from('tasks').update(data).eq('id', task.id);
+                    if(error) Swal.fire("Error", error.message, "error");
+                    else Swal.fire("Updated", "", "success");
+                } else {
+                    const { error } = await supabase.from('tasks').insert({ ...data, created_at: new Date() });
+                    if(error) Swal.fire("Error", error.message, "error");
+                    else Swal.fire("Task added", "", "success");
+                }
+                loadTab('tasks');
+            }
+        });
+    }
+
+    function renderFieldsList(){
+        const container = document.getElementById('fieldsList');
+        if(!container) return;
+        container.innerHTML = window.tempFields.map((f, idx) => `
+            <div class="field-item">
+                <input type="text" value="${f.label}" placeholder="Label" onchange="window.tempFields[${idx}].label = this.value">
+                <select onchange="window.tempFields[${idx}].type = this.value">
+                    <option value="text" ${f.type==='text'?'selected':''}>Text</option>
+                    <option value="email" ${f.type==='email'?'selected':''}>Email</option>
+                    <option value="number" ${f.type==='number'?'selected':''}>Number</option>
+                    <option value="file" ${f.type==='file'?'selected':''}>File Upload</option>
+                </select>
+                <label><input type="checkbox" ${f.required ? 'checked' : ''} onchange="window.tempFields[${idx}].required = this.checked"> Required</label>
+                <button class="btn-sm" onclick="window.tempFields.splice(${idx},1); renderFieldsList()">Remove</button>
+            </div>
+        `).join('');
+    }
+
+    async function addFieldModal(){
+        const { value: field } = await Swal.fire({
+            title: 'Add Custom Field',
+            html: `
+                <input id="fieldLabel" placeholder="Field Label (e.g., Email, Screenshot)">
+                <select id="fieldType">
+                    <option value="text">Text</option>
+                    <option value="email">Email</option>
+                    <option value="number">Number</option>
+                    <option value="file">File Upload</option>
+                </select>
+                <label><input type="checkbox" id="fieldRequired"> Required</label>
+            `,
+            preConfirm: () => ({
+                label: document.getElementById('fieldLabel').value,
+                type: document.getElementById('fieldType').value,
+                required: document.getElementById('fieldRequired').checked
+            })
+        });
+        if(field && field.label) return field;
+        return null;
     }
 
     async function renderSubmissions(){
         const { data: subs } = await supabase.from('submissions').select('*, tasks(title), profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Pending Submissions</h2>
-        <table><thead><tr><th>User</th><th>Task</th><th>Proof</th><th>Reward</th><th>Action</th></tr></thead><tbody>
+        <table><thead><tr><th>User</th><th>Task</th><th>Submitted Data</th><th>Reward</th><th>Action</th></tr></thead><tbody>
         ${subs?.map(s => `<tr>
             <td>${s.profiles?.name}</td>
             <td>${s.tasks?.title}</td>
-            <td>${s.proof?.slice(0,50)}</td>
+            <td>${s.submission_data ? Object.values(s.submission_data).join(', ').slice(0,50) : s.proof?.slice(0,50)}</td>
             <td class="flex-btns"><button class="btn-sm btn-approve approveSub" data-id="${s.id}" data-uid="${s.uid}" data-reward="${s.reward}">Approve</button>
             <button class="btn-sm btn-reject rejectSub" data-id="${s.id}">Reject</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No pending submissions</td></tr>'}
@@ -154,7 +253,6 @@
         return html;
     }
 
-    // ---------- Enhanced User Management ----------
     async function renderUsers(){
         const { data: users } = await supabase.from('profiles').select('*');
         return `<h2 class="section-title">User Management</h2>
@@ -166,114 +264,11 @@
             <td>${u.fraud_score||0}</td>
             <td>${u.account_status||'active'}</td>
             <td class="flex-btns">
-                <button class="btn-sm viewUserDashboard" data-user='${JSON.stringify(u)}'>Dashboard</button>
-                <button class="btn-sm editUser" data-user='${JSON.stringify(u)}'>Edit</button>
-                <button class="btn-sm adjustBalance" data-id="${u.id}" data-name="${u.name||u.email}">Balance +/-</button>
                 <button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
                 <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button>
             </td>
         </tr>`).join('')}
         </tbody></table>`;
-    }
-
-    async function showUserDashboard(user){
-        // fetch additional data: submissions, withdrawals, balance history
-        const [submissions, withdrawals, balanceHistory] = await Promise.all([
-            supabase.from('submissions').select('*, tasks(title)').eq('uid', user.id),
-            supabase.from('withdrawals').select('*').eq('uid', user.id).order('created_at', {ascending:false}),
-            supabase.from('balance_history').select('*').eq('uid', user.id).order('created_at', {ascending:false})
-        ]);
-        const totalTasks = submissions.data?.length || 0;
-        const completedTasks = submissions.data?.filter(s => s.status === 'approved').length || 0;
-        const pendingWithdrawals = withdrawals.data?.filter(w => w.status === 'pending').length || 0;
-        const totalWithdrawn = withdrawals.data?.filter(w => w.status === 'approved').reduce((sum, w) => sum + w.amount, 0) || 0;
-        Swal.fire({
-            title: `Dashboard: ${user.name || user.email}`,
-            width: '800px',
-            html: `<div style="text-align:left;">
-                <p><strong>Balance:</strong> ₹${user.balance}</p>
-                <p><strong>KYC Status:</strong> ${user.verification_status}</p>
-                <p><strong>Account Status:</strong> ${user.account_status}</p>
-                <p><strong>Fraud Score:</strong> ${user.fraud_score}</p>
-                <p><strong>Referral Code:</strong> ${user.referral_code}</p>
-                <p><strong>Total Referrals:</strong> ${user.total_referrals}</p>
-                <p><strong>Referral Earnings:</strong> ₹${user.referral_earnings}</p>
-                <hr>
-                <h3>Task Stats</h3>
-                <p>Total Submissions: ${totalTasks} | Approved: ${completedTasks}</p>
-                <h3>Withdrawals</h3>
-                <p>Pending: ${pendingWithdrawals} | Total Withdrawn: ₹${totalWithdrawn}</p>
-                <h3>Recent Balance History</h3>
-                <ul>${balanceHistory.data?.slice(0,5).map(h => `<li>${new Date(h.created_at).toLocaleString()} – ₹${h.amount_change} (${h.reason}) → Balance: ₹${h.new_balance}</li>`).join('') || '<li>No history</li>'}</ul>
-            </div>`,
-            confirmButtonText: 'Close'
-        });
-    }
-
-    async function editUserModal(user){
-        const { value: formValues } = await Swal.fire({
-            title: `Edit User: ${user.name || user.email}`,
-            html: `
-                <input id="name" value="${user.name || ''}" placeholder="Name">
-                <input id="email" value="${user.email}" placeholder="Email">
-                <select id="verification_status">
-                    <option value="pending" ${user.verification_status==='pending'?'selected':''}>Pending</option>
-                    <option value="verified" ${user.verification_status==='verified'?'selected':''}>Verified</option>
-                    <option value="rejected" ${user.verification_status==='rejected'?'selected':''}>Rejected</option>
-                </select>
-                <select id="account_status">
-                    <option value="active" ${user.account_status==='active'?'selected':''}>Active</option>
-                    <option value="suspended" ${user.account_status==='suspended'?'selected':''}>Suspended</option>
-                </select>
-                <input type="number" id="fraud_score" value="${user.fraud_score || 0}" placeholder="Fraud Score">
-            `,
-            focusConfirm: false,
-            preConfirm: () => ({
-                name: document.getElementById('name').value,
-                email: document.getElementById('email').value,
-                verification_status: document.getElementById('verification_status').value,
-                account_status: document.getElementById('account_status').value,
-                fraud_score: parseInt(document.getElementById('fraud_score').value) || 0
-            })
-        });
-        if(formValues){
-            const { error } = await supabase.from('profiles').update(formValues).eq('id', user.id);
-            if(error) Swal.fire("Error", error.message, "error");
-            else { Swal.fire("Updated", "User data updated.", "success"); loadTab('users'); }
-        }
-    }
-
-    async function adjustBalanceModal(userId, userName){
-        const { value: amount } = await Swal.fire({
-            title: `Adjust balance for ${userName}`,
-            input: 'number',
-            inputLabel: 'Enter amount (positive to add, negative to subtract)',
-            inputPlaceholder: 'e.g., 100 or -50',
-            showCancelButton: true
-        });
-        if(amount && !isNaN(amount)){
-            const change = parseInt(amount);
-            if(change === 0) return;
-            // Fetch current balance
-            const { data: profile, error: fetchError } = await supabase.from('profiles').select('balance').eq('id', userId).single();
-            if(fetchError) return Swal.fire("Error", fetchError.message, "error");
-            const newBalance = (profile.balance || 0) + change;
-            const reason = `Admin adjustment: ${change > 0 ? '+' : ''}${change}`;
-            // Update profile and insert history
-            const { error: updateError } = await supabase.from('profiles').update({ balance: newBalance }).eq('id', userId);
-            if(updateError) return Swal.fire("Error", updateError.message, "error");
-            const { error: historyError } = await supabase.from('balance_history').insert({
-                uid: userId,
-                amount_change: change,
-                new_balance: newBalance,
-                reason: reason,
-                created_by: currentAdmin.id,
-                created_at: new Date()
-            });
-            if(historyError) console.error("History insert error", historyError);
-            Swal.fire("Balance Updated", `New balance: ₹${newBalance}`, "success");
-            loadTab('users');
-        }
     }
 
     async function renderWithdrawals(){
@@ -287,7 +282,7 @@
             <td>${w.details}</td>
             <td><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
             <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
-        </tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
+        <tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
         </tbody></table>`;
     }
 
@@ -322,17 +317,10 @@
     }
 
     function attachEvents(){
-        document.getElementById('addTaskBtn')?.addEventListener('click', showAddTaskModal);
+        document.getElementById('addTaskBtn')?.addEventListener('click', () => showTaskModal());
+        document.querySelectorAll('.editTask').forEach(btn => btn.addEventListener('click', () => showTaskModal(JSON.parse(btn.dataset.task))));
         document.querySelectorAll('.deleteTask').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('tasks').delete().eq('id', btn.dataset.id); Swal.fire("Deleted"); loadTab(activeTab); }));
-        document.querySelectorAll('.approveSub').forEach(btn => btn.addEventListener('click', async () => { 
-            await supabase.from('submissions').update({ status: 'approved' }).eq('id', btn.dataset.id);
-            const { data: p } = await supabase.from('profiles').select('balance').eq('id', btn.dataset.uid).single();
-            const newBal = (p.balance || 0) + parseInt(btn.dataset.reward);
-            await supabase.from('profiles').update({ balance: newBal }).eq('id', btn.dataset.uid);
-            // log in balance_history
-            await supabase.from('balance_history').insert({ uid: btn.dataset.uid, amount_change: parseInt(btn.dataset.reward), new_balance: newBal, reason: `Task approval (submission ${btn.dataset.id})`, created_by: currentAdmin.id });
-            Swal.fire("Approved! Reward added."); loadTab(activeTab);
-        }));
+        document.querySelectorAll('.approveSub').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('submissions').update({ status: 'approved' }).eq('id', btn.dataset.id); const { data: p } = await supabase.from('profiles').select('balance').eq('id', btn.dataset.uid).single(); const newBal = (p.balance || 0) + parseInt(btn.dataset.reward); await supabase.from('profiles').update({ balance: newBal }).eq('id', btn.dataset.uid); Swal.fire("Approved! Reward added."); loadTab(activeTab); }));
         document.querySelectorAll('.rejectSub').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('submissions').update({ status: 'rejected' }).eq('id', btn.dataset.id); Swal.fire("Rejected"); loadTab(activeTab); }));
         document.querySelectorAll('.verifyKyc').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('verifications').update({ status: 'verified' }).eq('id', btn.dataset.id); await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', btn.dataset.uid); Swal.fire("KYC Approved"); loadTab(activeTab); }));
         document.querySelectorAll('.rejectKyc').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('verifications').update({ status: 'rejected' }).eq('id', btn.dataset.id); Swal.fire("Rejected"); loadTab(activeTab); }));
@@ -340,19 +328,6 @@
         document.querySelectorAll('.deleteUser').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('profiles').delete().eq('id', btn.dataset.id); Swal.fire("Deleted"); loadTab(activeTab); }));
         document.querySelectorAll('.approveWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', btn.dataset.id); Swal.fire("Withdrawal Approved"); loadTab(activeTab); }));
         document.querySelectorAll('.rejectWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'rejected' }).eq('id', btn.dataset.id); Swal.fire("Rejected"); loadTab(activeTab); }));
-        
-        // New user management buttons
-        document.querySelectorAll('.viewUserDashboard').forEach(btn => {
-            btn.addEventListener('click', () => showUserDashboard(JSON.parse(btn.dataset.user)));
-        });
-        document.querySelectorAll('.editUser').forEach(btn => {
-            btn.addEventListener('click', () => editUserModal(JSON.parse(btn.dataset.user)));
-        });
-        document.querySelectorAll('.adjustBalance').forEach(btn => {
-            btn.addEventListener('click', () => adjustBalanceModal(btn.dataset.id, btn.dataset.name));
-        });
-        
-        // Chat events
         const sendBtn = document.getElementById('sendAdminReply');
         if(sendBtn){
             sendBtn.addEventListener('click', async () => {
@@ -368,10 +343,6 @@
         if(userSelect){
             userSelect.addEventListener('change', (e) => { localStorage.setItem('selectedChatUserId', e.target.value); loadTab('chat'); });
         }
-    }
-
-    function showAddTaskModal(){
-        Swal.fire({ title:'New Task', html:`<input id="taskTitle" placeholder="Title"><textarea id="taskDesc" placeholder="Description"></textarea><input id="taskReward" placeholder="Reward"><input id="taskCategory" placeholder="Category"><input id="taskLink" placeholder="URL">`, preConfirm:()=>({ title:document.getElementById('taskTitle').value, desc:document.getElementById('taskDesc').value, reward:document.getElementById('taskReward').value, category:document.getElementById('taskCategory').value, link:document.getElementById('taskLink').value }) }).then(async(r)=>{ if(r.value){ await supabase.from('tasks').insert({ title:r.value.title, description:r.value.desc, reward:parseInt(r.value.reward), category:r.value.category, link:r.value.link, created_at:new Date() }); Swal.fire("Task Added"); loadTab(activeTab); } });
     }
 
     document.querySelectorAll('.nav-item[data-tab]').forEach(el => el.addEventListener('click', () => loadTab(el.dataset.tab)));
