@@ -62,10 +62,6 @@
         .countdown { font-size:0.8rem; background:#00000050; padding:4px 8px; border-radius:20px; display:inline-block; margin-top:8px; }
         .leaderboard-card { background:#0f172a; border-radius:24px; padding:1rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; }
         .rank { font-size:1.5rem; font-weight:bold; color:#00f2fe; width:50px; }
-        .notif-dropdown { position:absolute; top:60px; right:20px; background:#0f172a; border-radius:20px; width:300px; max-height:400px; overflow-y:auto; z-index:200; box-shadow:0 10px 25px rgba(0,0,0,0.5); border:1px solid cyan; display:none; }
-        .notif-item { padding:12px; border-bottom:1px solid #2a3a5a; cursor:pointer; }
-        .notif-item:hover { background:#1e2a47; }
-        .notif-item.unread { background:#1a2a3a; }
     </style>
 </head>
 <body>
@@ -259,7 +255,7 @@
             }
         }
 
-        // ---------- Dashboard Functions (unchanged from previous final) ----------
+        // ---------- Dashboard Functions ----------
         async function renderDashboard() {
             const { data: submissions } = await supabase.from('submissions').select('status').eq('uid', currentUser.id);
             const total = submissions?.length || 0;
