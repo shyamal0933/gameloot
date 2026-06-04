@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* (same styles as before – keep unchanged) */
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Inter',sans-serif; }
         body { background:#0b0e17; color:#eef5ff; overflow-x:hidden; }
         .top-bar { display:flex; justify-content:space-between; align-items:center; padding:1rem 2rem; background:rgba(10,14,23,0.8); backdrop-filter:blur(10px); border-bottom:1px solid rgba(0,242,254,0.2); position:sticky; top:0; z-index:100; }
@@ -100,7 +101,7 @@
             } catch(e) { return 'unknown'; }
         }
 
-        // ---------- Notifications ----------
+        // ---------- Notifications (same as before) ----------
         async function fetchNotifications() {
             const { data } = await supabase.from('notifications').select('*').eq('uid', currentUser.id).order('created_at', { ascending: false }).limit(20);
             unreadCount = data?.filter(n => !n.is_read).length || 0;
@@ -160,7 +161,7 @@
             `).join('') || '<p>No users yet.</p>'}</div>`;
         }
 
-        // ---------- Ensure Profile (with fraud data) ----------
+        // ---------- Ensure Profile (with IP/fingerprint) ----------
         async function ensureProfile(userId, email, metadataName) {
             let { data: profile, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
             if (error && error.code === 'PGRST116') {
@@ -186,17 +187,48 @@
                     total_earnings: 0
                 };
                 await supabase.from('profiles').insert(newProfile);
-                await supabase.from('user_activity').insert({ uid: userId, signup_ip: ip, device_fingerprint: fingerprint, created_at: new Date() });
+                // Insert into user_activity
+                await supabase.from('user_activity').insert({ 
+                    uid: userId, 
+                    signup_ip: ip, 
+                    device_fingerprint: fingerprint, 
+                    created_at: new Date(),
+                    ip_address: ip,
+                    user_agent: navigator.userAgent
+                });
+                console.log("✅ User activity logged on signup:", { ip, fingerprint });
                 profile = newProfile;
             } else if (error) throw error;
-            // Update last login IP & timestamp
+            
+            // Update last login IP & timestamp on every login
             const ip = await getIP();
-            await supabase.from('user_activity').update({ last_login_ip: ip, ip_address: ip, user_agent: navigator.userAgent }).eq('uid', userId);
+            const fingerprint = getFingerprint();
+            // Check if user_activity row exists, if not create one
+            const { data: existingActivity } = await supabase.from('user_activity').select('id').eq('uid', userId).maybeSingle();
+            if (existingActivity) {
+                await supabase.from('user_activity').update({ 
+                    last_login_ip: ip, 
+                    ip_address: ip,
+                    user_agent: navigator.userAgent,
+                    device_fingerprint: fingerprint
+                }).eq('uid', userId);
+            } else {
+                await supabase.from('user_activity').insert({ 
+                    uid: userId, 
+                    signup_ip: ip, 
+                    last_login_ip: ip,
+                    ip_address: ip,
+                    device_fingerprint: fingerprint,
+                    user_agent: navigator.userAgent,
+                    created_at: new Date()
+                });
+            }
             await supabase.from('profiles').update({ last_login_at: new Date() }).eq('id', userId);
+            console.log("✅ Last login IP updated:", ip);
             return profile;
         }
 
-        // ---------- Auth Modals ----------
+        // ---------- Auth Modals (with IP capture on signup) ----------
         async function showSignUpModal() {
             const { value: form } = await Swal.fire({
                 title: 'Create Account',
@@ -255,7 +287,7 @@
             }
         }
 
-        // ---------- Dashboard Functions ----------
+        // ---------- Dashboard Functions (same as before, but ensure leaderboard exists) ----------
         async function renderDashboard() {
             const { data: submissions } = await supabase.from('submissions').select('status').eq('uid', currentUser.id);
             const total = submissions?.length || 0;
