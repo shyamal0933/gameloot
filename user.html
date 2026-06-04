@@ -9,16 +9,15 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* (same styles as before – keep as in previous final version) */
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Inter',sans-serif; }
         body { background:#0b0e17; color:#eef5ff; padding-bottom:70px; }
-        /* desktop sidebar */
         .sidebar { position:fixed; top:0; left:0; width:280px; height:100vh; background:rgba(15,20,35,0.95); backdrop-filter:blur(16px); border-right:1px solid rgba(0,242,254,0.25); padding:2rem 1rem; z-index:100; transition:transform 0.3s; overflow-y:auto; }
         .logo { font-size:1.8rem; font-weight:800; background:linear-gradient(135deg,#00f2fe,#4facfe); -webkit-background-clip:text; background-clip:text; color:transparent; margin-bottom:2rem; text-align:center; }
         .nav-item { display:flex; align-items:center; gap:12px; padding:12px 20px; margin:6px 0; border-radius:40px; cursor:pointer; color:#a0abcf; transition:0.2s; }
         .nav-item i { width:26px; }
         .nav-item.active,.nav-item:hover { background:rgba(0,242,254,0.12); color:#00f2fe; }
         .main-panel { margin-left:280px; padding:2rem; transition:margin 0.3s; }
-        /* mobile bottom nav */
         .bottom-nav { display:none; position:fixed; bottom:0; left:0; width:100%; background:rgba(10,14,23,0.95); backdrop-filter:blur(20px); border-top:1px solid rgba(0,242,254,0.3); padding:10px 16px; justify-content:space-around; z-index:200; }
         .bottom-nav-item { display:flex; flex-direction:column; align-items:center; gap:4px; color:#8e9acf; font-size:0.7rem; cursor:pointer; padding:6px 12px; border-radius:30px; }
         .bottom-nav-item i { font-size:1.4rem; }
@@ -28,7 +27,6 @@
             .main-panel { margin-left:0; padding:1rem 1rem 80px 1rem; }
             .bottom-nav { display:flex; }
         }
-        /* UI components */
         .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; margin-bottom:2rem; }
         .stat-card { background:rgba(20,28,45,0.7); backdrop-filter:blur(8px); border-radius:28px; padding:1.2rem; border:1px solid rgba(0,255,255,0.2); transition:0.2s; }
         .stat-card:hover { transform:translateY(-3px); box-shadow:0 8px 20px rgba(0,242,254,0.1); }
@@ -54,6 +52,7 @@
         .payment-badge { background:#00f2fe20; color:#00f2fe; padding:4px 12px; border-radius:40px; font-size:0.8rem; }
         .btn-sm { padding:6px 12px; font-size:0.8rem; background:#1e2a47; }
         .btn-danger { background:#ef4444; }
+        .withdraw-kyc-block { text-align:center; padding:2rem; background:#0f172a; border-radius:28px; margin:1rem 0; }
     </style>
 </head>
 <body>
@@ -305,14 +304,14 @@
         }
     }
 
-    // ---------- Withdrawal with payment methods & KYC check ----------
+    // ---------- Withdrawal with Add Bank (UPI or Bank) & KYC check ----------
     async function renderWithdraw(){
         // Check KYC status first
         if(userProfile.verification_status !== 'verified'){
             return `
             <h2>💸 Withdraw Funds</h2>
-            <div class="stat-card" style="text-align:center;">
-                <i class="fas fa-id-card" style="font-size:3rem; color:#f59e0b;"></i>
+            <div class="withdraw-kyc-block">
+                <i class="fas fa-id-card" style="font-size:4rem; color:#f59e0b;"></i>
                 <h3>KYC Verification Required</h3>
                 <p>You must complete your KYC before you can withdraw.</p>
                 <button id="goToKycBtn" class="btn-sm">Complete KYC Now</button>
@@ -330,79 +329,119 @@
             <div class="stat-card"><h4>Min Withdrawal</h4><div class="value">₹100</div></div>
         </div>
 
-        <h3>Your Payment Methods</h3>
+        <h3>Your Bank/UPI Accounts</h3>
         <div id="paymentMethodsList">
-            ${methods?.length ? methods.map(m => `
+            ${methods?.length ? methods.map(m => {
+                let displayDetails = m.details;
+                if(m.type === 'bank') {
+                    try {
+                        const bankData = JSON.parse(m.details);
+                        displayDetails = `${bankData.name} | ${bankData.account} | IFSC: ${bankData.ifsc}`;
+                    } catch(e) {}
+                }
+                return `
                 <div class="payment-method-card" data-id="${m.id}">
-                    <div><span class="payment-badge">${m.type.replace('_',' ').toUpperCase()}</span><br><small>${m.details}</small></div>
+                    <div><span class="payment-badge">${m.type.toUpperCase()}</span><br><small>${displayDetails}</small></div>
                     <div>
-                        <button class="btn-sm setDefaultMethod" data-id="${m.id}" ${m.is_default ? 'disabled' : ''}>${m.is_default ? 'Default' : 'Set Default'}</button>
                         <button class="btn-sm btn-danger deleteMethod" data-id="${m.id}">Delete</button>
                     </div>
-                </div>
-            `).join('') : '<p>No payment methods added. Add one below.</p>'}
+                </div>`;
+            }).join('') : '<p>No payment methods added. Click below to add.</p>'}
         </div>
 
-        <button id="addPaymentMethodBtn" class="btn-sm" style="margin:1rem 0;"><i class="fas fa-plus"></i> Add Payment Method</button>
+        <button id="addPaymentMethodBtn" class="btn-sm" style="margin:1rem 0;"><i class="fas fa-plus"></i> Add Bank / UPI</button>
 
         <h3>Request Withdrawal</h3>
         <form id="wdForm">
             <select id="wdMethodSelect" required>
                 <option value="">Select payment method</option>
-                ${methods?.map(m => `<option value="${m.id}" ${m.is_default ? 'selected' : ''}>${m.type.toUpperCase()} - ${m.details}</option>`).join('')}
+                ${methods?.map(m => {
+                    let display = m.type.toUpperCase();
+                    if(m.type === 'UPI') display += ` - ${m.details}`;
+                    else if(m.type === 'bank') {
+                        try {
+                            const bankData = JSON.parse(m.details);
+                            display += ` - ${bankData.name} (${bankData.account})`;
+                        } catch(e) { display += ` - ${m.details}`; }
+                    } else display += ` - ${m.details}`;
+                    return `<option value="${m.id}">${display}</option>`;
+                }).join('')}
             </select>
             <input type="number" id="wdAmount" placeholder="Amount (Min ₹100)" required>
             <button type="submit">Request Withdrawal</button>
         </form>`;
     }
 
-    // Add/Edit payment method modal
+    // Add Bank/UPI modal
     async function addPaymentMethod() {
-        const { value: formValues } = await Swal.fire({
+        const { value: methodType } = await Swal.fire({
             title: 'Add Payment Method',
-            html: `
-                <select id="pmType" class="swal2-input">
-                    <option value="UPI">UPI</option>
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="crypto">Crypto</option>
-                </select>
-                <input id="pmDetails" class="swal2-input" placeholder="Enter details (UPI ID / Bank Account details / Crypto address)">
-            `,
-            focusConfirm: false,
-            preConfirm: () => {
-                const type = document.getElementById('pmType').value;
-                const details = document.getElementById('pmDetails').value;
-                if(!details) Swal.showValidationMessage('Please enter details');
-                return { type, details };
-            }
+            text: 'Choose type',
+            input: 'select',
+            inputOptions: {
+                'UPI': 'UPI (UPI ID)',
+                'bank': 'Bank Account (Name, Account Number, IFSC)'
+            },
+            inputPlaceholder: 'Select',
+            showCancelButton: true
         });
-        if(formValues){
-            const { error } = await supabase.from('payment_methods').insert({
-                uid: currentUser.id,
-                type: formValues.type,
-                details: formValues.details,
-                is_default: false
+        if(!methodType) return;
+
+        if(methodType === 'UPI') {
+            const { value: upiId } = await Swal.fire({
+                title: 'Enter UPI ID',
+                input: 'text',
+                inputPlaceholder: 'e.g., username@okhdfcbank',
+                showCancelButton: true
             });
-            if(error) toast(error.message, "error");
-            else { toast("Payment method added","success"); renderPanel('withdraw'); }
+            if(upiId) {
+                const { error } = await supabase.from('payment_methods').insert({
+                    uid: currentUser.id,
+                    type: 'UPI',
+                    details: upiId,
+                    is_default: false
+                });
+                if(error) toast(error.message, "error");
+                else { toast("UPI ID saved","success"); renderPanel('withdraw'); }
+            }
+        } else if(methodType === 'bank') {
+            const { value: form } = await Swal.fire({
+                title: 'Bank Account Details',
+                html: `
+                    <input id="bankName" class="swal2-input" placeholder="Full Name (as in account)">
+                    <input id="bankAccount" class="swal2-input" placeholder="Account Number">
+                    <input id="bankIfsc" class="swal2-input" placeholder="IFSC Code">
+                `,
+                focusConfirm: false,
+                preConfirm: () => {
+                    const name = document.getElementById('bankName').value;
+                    const account = document.getElementById('bankAccount').value;
+                    const ifsc = document.getElementById('bankIfsc').value;
+                    if(!name || !account || !ifsc) Swal.showValidationMessage('All fields required');
+                    return { name, account, ifsc };
+                }
+            });
+            if(form) {
+                const details = JSON.stringify({ name: form.name, account: form.account, ifsc: form.ifsc });
+                const { error } = await supabase.from('payment_methods').insert({
+                    uid: currentUser.id,
+                    type: 'bank',
+                    details: details,
+                    is_default: false
+                });
+                if(error) toast(error.message, "error");
+                else { toast("Bank account saved","success"); renderPanel('withdraw'); }
+            }
         }
     }
 
     async function deletePaymentMethod(methodId) {
-        const confirm = await Swal.fire({ title: 'Delete?', text: 'Are you sure?', icon: 'warning', showCancelButton: true });
+        const confirm = await Swal.fire({ title: 'Delete?', text: 'Remove this payment method?', icon: 'warning', showCancelButton: true });
         if(confirm.isConfirmed){
             const { error } = await supabase.from('payment_methods').delete().eq('id', methodId);
             if(error) toast(error.message, "error");
             else { toast("Deleted","success"); renderPanel('withdraw'); }
         }
-    }
-
-    async function setDefaultMethod(methodId) {
-        // First set all to false for this user
-        await supabase.from('payment_methods').update({ is_default: false }).eq('uid', currentUser.id);
-        const { error } = await supabase.from('payment_methods').update({ is_default: true }).eq('id', methodId);
-        if(error) toast(error.message, "error");
-        else { toast("Default method updated","success"); renderPanel('withdraw'); }
     }
 
     async function requestWithdrawal(amount, methodId) {
@@ -411,11 +450,20 @@
         // Get method details
         const { data: method } = await supabase.from('payment_methods').select('*').eq('id', methodId).single();
         if(!method) return toast("Invalid payment method","error");
+        let detailsString = method.details;
+        if(method.type === 'bank') {
+            try {
+                const bankData = JSON.parse(method.details);
+                detailsString = `${bankData.name}, A/c: ${bankData.account}, IFSC: ${bankData.ifsc}`;
+            } catch(e) {}
+        } else if(method.type === 'UPI') {
+            detailsString = method.details;
+        }
         const { error } = await supabase.from('withdrawals').insert({
             uid: currentUser.id,
             amount: amount,
             method: method.type,
-            details: method.details,
+            details: detailsString,
             status: 'pending',
             created_at: new Date()
         });
@@ -460,10 +508,9 @@
         document.querySelectorAll('.completeTaskBtn').forEach(btn=>btn.addEventListener('click',()=>showSubmissionPopup(btn.dataset.id,btn.dataset.reward)));
         // KYC
         document.getElementById('submitModernKyc')?.addEventListener('click',submitModernKyc);
-        // Withdraw - add method, delete, default, submit
+        // Withdraw
         document.getElementById('addPaymentMethodBtn')?.addEventListener('click', addPaymentMethod);
         document.querySelectorAll('.deleteMethod')?.forEach(btn => btn.addEventListener('click', (e) => deletePaymentMethod(btn.dataset.id)));
-        document.querySelectorAll('.setDefaultMethod')?.forEach(btn => btn.addEventListener('click', (e) => setDefaultMethod(btn.dataset.id)));
         document.getElementById('wdForm')?.addEventListener('submit', async(e) => {
             e.preventDefault();
             const methodId = document.getElementById('wdMethodSelect').value;
