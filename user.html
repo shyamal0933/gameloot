@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>GameLoot | Work Small, Earn Big</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -37,7 +37,10 @@
             .main-panel { margin-left:0; padding:1rem 1rem 80px 1rem; }
             .bottom-nav { display:flex; }
             .hero h1 { font-size:2rem; }
+            .hero p { font-size:1rem; }
+            .auth-buttons button { padding:6px 14px; font-size:0.9rem; }
         }
+        /* Dashboard components - same as before */
         .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; margin-bottom:2rem; }
         .stat-card { background:rgba(20,28,45,0.7); backdrop-filter:blur(8px); border-radius:28px; padding:1.2rem; border:1px solid rgba(0,255,255,0.2); }
         .stat-card h4 { font-size:0.8rem; color:#8e9acf; }
@@ -58,6 +61,59 @@
         .chat-box { height:280px; overflow-y:auto; background:#0f1222; border-radius:24px; padding:1rem; margin-bottom:1rem; }
         .help-content { background:#0f1222; border-radius:16px; padding:1rem; margin:1rem 0; }
         .countdown { font-size:0.8rem; background:#00000050; padding:4px 8px; border-radius:20px; display:inline-block; margin-top:8px; }
+        /* Enhanced modal custom styles (SweetAlert2 override) */
+        .custom-auth-modal {
+            background: rgba(15, 25, 45, 0.95) !important;
+            backdrop-filter: blur(16px);
+            border-radius: 32px !important;
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        .custom-auth-modal .swal2-title {
+            color: #00f2fe;
+            font-size: 1.8rem;
+        }
+        .custom-auth-modal .swal2-html-container {
+            padding: 0 1rem 1rem;
+        }
+        .custom-auth-modal input, 
+        .custom-auth-modal select {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 60px;
+            padding: 14px 20px;
+            margin: 12px 0;
+            width: 100%;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .custom-auth-modal input:focus {
+            border-color: #00f2fe;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0,242,254,0.2);
+        }
+        .custom-auth-modal .swal2-confirm {
+            background: linear-gradient(95deg, #0055ff, #00c3ff);
+            border-radius: 60px;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .custom-auth-modal .swal2-cancel {
+            background: transparent;
+            border: 1px solid #00f2fe;
+            color: #00f2fe;
+            border-radius: 60px;
+            padding: 12px 24px;
+        }
+        @media (max-width: 500px) {
+            .custom-auth-modal {
+                width: 90% !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -74,7 +130,79 @@
 
         function toast(msg, icon='info'){ Swal.fire({toast:true,position:'top-end',icon,title:msg,showConfirmButton:false,timer:3000}); }
 
-        // ---------- Helper to ensure profile exists ----------
+        // ---------- Enhanced Auth Modals ----------
+        async function showSignUpModal() {
+            const { value: form } = await Swal.fire({
+                title: 'Create Account',
+                html: `
+                    <div style="text-align:left">
+                        <input id="signupName" placeholder="Full Name" autocomplete="name">
+                        <input id="signupEmail" placeholder="Email" type="email" autocomplete="email">
+                        <input id="signupPassword" type="password" placeholder="Password (min 6 chars)" autocomplete="new-password">
+                        <input id="signupRef" placeholder="Referral Code (optional)" autocomplete="off">
+                    </div>
+                `,
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: 'Sign Up',
+                cancelButtonText: 'Cancel',
+                customClass: { popup: 'custom-auth-modal' },
+                preConfirm: () => {
+                    const name = document.getElementById('signupName').value.trim();
+                    const email = document.getElementById('signupEmail').value.trim();
+                    const password = document.getElementById('signupPassword').value;
+                    const ref = document.getElementById('signupRef').value.trim();
+                    if (!name) Swal.showValidationMessage('Full name is required');
+                    else if (!email) Swal.showValidationMessage('Email is required');
+                    else if (!password) Swal.showValidationMessage('Password is required');
+                    else if (password.length < 6) Swal.showValidationMessage('Password must be at least 6 characters');
+                    else return { name, email, password, ref };
+                }
+            });
+            if (form) {
+                const { error } = await supabase.auth.signUp({
+                    email: form.email,
+                    password: form.password,
+                    options: { data: { name: form.name, referral: form.ref } }
+                });
+                if (error) toast(error.message, "error");
+                else {
+                    toast("Verification email sent! Check your inbox and spam.", "success");
+                    showSignInModal();
+                }
+            }
+        }
+
+        async function showSignInModal() {
+            const { value: form } = await Swal.fire({
+                title: 'Welcome Back',
+                html: `
+                    <div style="text-align:left">
+                        <input id="loginEmail" placeholder="Email" type="email" autocomplete="email">
+                        <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password">
+                    </div>
+                `,
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: 'Sign In',
+                cancelButtonText: 'Cancel',
+                customClass: { popup: 'custom-auth-modal' },
+                preConfirm: () => {
+                    const email = document.getElementById('loginEmail').value.trim();
+                    const password = document.getElementById('loginPassword').value;
+                    if (!email) Swal.showValidationMessage('Email is required');
+                    else if (!password) Swal.showValidationMessage('Password is required');
+                    else return { email, password };
+                }
+            });
+            if (form) {
+                const { error } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
+                if (error) toast(error.message, "error");
+                else location.reload();
+            }
+        }
+
+        // ---------- Ensure Profile (same as before) ----------
         async function ensureProfile(userId, email, metadataName) {
             let { data: profile, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
             if (error && error.code === 'PGRST116') {
@@ -103,57 +231,7 @@
             return profile;
         }
 
-        // ---------- Auth Modals ----------
-        async function showSignUpModal() {
-            const { value: form } = await Swal.fire({
-                title: 'Create Account',
-                html: `<input id="signupName" class="swal2-input" placeholder="Full Name" required>
-                       <input id="signupEmail" class="swal2-input" placeholder="Email" required>
-                       <input id="signupPassword" type="password" class="swal2-input" placeholder="Password (min 6 chars)" required>
-                       <input id="signupRef" class="swal2-input" placeholder="Referral Code (optional)">`,
-                focusConfirm: false,
-                preConfirm: () => {
-                    const name = document.getElementById('signupName').value;
-                    const email = document.getElementById('signupEmail').value;
-                    const password = document.getElementById('signupPassword').value;
-                    const ref = document.getElementById('signupRef').value;
-                    if (!name || !email || !password) Swal.showValidationMessage('All fields required');
-                    if (password.length < 6) Swal.showValidationMessage('Password must be at least 6 characters');
-                    return { name, email, password, ref };
-                }
-            });
-            if (form) {
-                const { error } = await supabase.auth.signUp({
-                    email: form.email,
-                    password: form.password,
-                    options: { data: { name: form.name, referral: form.ref } }
-                });
-                if (error) toast(error.message, "error");
-                else {
-                    toast("Verification email sent! Check your inbox.", "success");
-                    showSignInModal();
-                }
-            }
-        }
-
-        async function showSignInModal() {
-            const { value: form } = await Swal.fire({
-                title: 'Welcome Back',
-                html: `<input id="loginEmail" class="swal2-input" placeholder="Email" required>
-                       <input id="loginPassword" type="password" class="swal2-input" placeholder="Password" required>`,
-                preConfirm: () => ({
-                    email: document.getElementById('loginEmail').value,
-                    password: document.getElementById('loginPassword').value
-                })
-            });
-            if (form) {
-                const { error } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password });
-                if (error) toast(error.message, "error");
-                else location.reload();
-            }
-        }
-
-        // ---------- Dashboard Functions (simplified but complete) ----------
+        // ---------- Dashboard Functions (unchanged, but keep full implementation) ----------
         async function renderDashboard() {
             const { data: submissions } = await supabase.from('submissions').select('status').eq('uid', currentUser.id);
             const total = submissions?.length || 0;
@@ -464,7 +542,7 @@
             </div>`;
         }
 
-        // Main Auth Check
+        // ---------- Main Auth Check ----------
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
             document.getElementById('root').innerHTML = renderHeroPage();
