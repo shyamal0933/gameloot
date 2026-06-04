@@ -52,6 +52,8 @@
         .btn-sm { padding:6px 12px; font-size:0.8rem; background:#1e2a47; }
         .countdown { font-size:0.8rem; background:#00000050; padding:4px 8px; border-radius:20px; display:inline-block; margin-top:8px; }
         .help-content { background:#0f1222; border-radius:16px; padding:1rem; margin:1rem 0; font-size:0.9rem; }
+        .task-detail-modal { max-height:80vh; overflow-y:auto; }
+        .rejection-reason { background:#7f1a1a; border-radius:12px; padding:0.8rem; margin-bottom:1rem; }
     </style>
 </head>
 <body>
@@ -157,27 +159,26 @@
         </div>`;
     }
 
-    // ---------- TASKS with custom fields, help, deadline ----------
+    // ---------- TASKS: start modal, countdown, submit ----------
     async function renderTasks(){
         const { data: tasks } = await supabase.from('tasks').select('*').order('deadline', { ascending: true, nullsFirst: false });
         return `<h2>🔥 Available Tasks</h2>
         <div class="tasks-container">
             ${tasks?.map(t => `
-                <div class="task-card" data-task-id="${t.id}">
+                <div class="task-card">
                     <h3>${t.title}</h3>
                     <p>${t.description}</p>
                     <div class="reward-badge">+₹${t.reward}</div>
                     <div><a href="${t.link}" target="_blank" class="btn-sm" style="display:inline-block;">Visit Task Link</a></div>
-                    ${t.deadline ? `<div class="countdown" data-deadline="${t.deadline}">Loading countdown...</div>` : ''}
+                    ${t.deadline ? `<div class="countdown" data-deadline="${t.deadline}" data-id="${t.id}">Loading countdown...</div>` : ''}
                     <div class="help-content" style="display:none;" id="help-${t.id}">${t.help_text || ''}</div>
                     <button class="toggleHelpBtn" data-id="${t.id}">Show Help</button>
-                    <button class="startTaskBtn" data-id="${t.id}" data-title="${t.title}" data-reward="${t.reward}" data-fields='${JSON.stringify(t.custom_fields || [])}'>Start Task</button>
+                    <button class="startTaskBtn" data-task='${JSON.stringify(t)}'>Start Task</button>
                 </div>
             `).join('') || '<p>No tasks yet. Admin will add soon.</p>'}
         </div>`;
     }
 
-    // Countdown timer script (will run after rendering)
     function initCountdowns(){
         document.querySelectorAll('.countdown').forEach(el => {
             const deadline = new Date(el.dataset.deadline);
@@ -186,7 +187,7 @@
                 const now = new Date();
                 const diff = deadline - now;
                 if(diff <= 0){
-                    el.innerHTML = "Task expired";
+                    el.innerHTML = "⏰ Task expired";
                     el.style.color = "#ef4444";
                     const taskCard = el.closest('.task-card');
                     const startBtn = taskCard?.querySelector('.startTaskBtn');
@@ -205,6 +206,138 @@
         });
     }
 
+    async function startTask(task){
+        // Check if already submitted
+        const { data: existing } = await supabase.from('submissions').select('id, status, rejection_reason').eq('uid', currentUser.id).eq('task_id', task.id).maybeSingle();
+        if(existing && existing.status === 'pending'){
+            toast("You already have a pending submission for this task.", "warning");
+            return;
+        }
+        if(existing && existing.status === 'approved'){
+            toast("You have already completed this task.", "success");
+            return;
+        }
+        // If rejected, show reason and allow resubmission
+        let rejectionHtml = '';
+        if(existing && existing.status === 'rejected' && existing.rejection_reason){
+            rejectionHtml = `<div class="rejection-reason"><strong>Previous submission was rejected:</strong><br>${existing.rejection_reason}</div>`;
+        }
+        // Build dynamic form based on task.custom_fields
+        const customFields = task.custom_fields || [];
+        let fieldsHtml = '';
+        for(const field of customFields){
+            fieldsHtml += `<div style="margin-bottom:1rem;">
+                <label>${field.label} ${field.required ? '*' : ''}</label>`;
+            if(field.type === 'file'){
+                fieldsHtml += `<input type="file" id="field_${field.label.replace(/\s/g,'_')}" ${field.required ? 'required' : ''}>`;
+                fieldsHtml += `<div class="image-preview" id="preview_${field.label.replace(/\s/g,'_')}" style="display:none;"></div>`;
+            } else {
+                fieldsHtml += `<input type="${field.type}" id="field_${field.label.replace(/\s/g,'_')}" ${field.required ? 'required' : ''}>`;
+            }
+            fieldsHtml += `</div>`;
+        }
+        const { value: formData } = await Swal.fire({
+            title: task.title,
+            html: `
+                <div class="task-detail-modal">
+                    <p><strong>Description:</strong> ${task.description}</p>
+                    <p><strong>Reward:</strong> ₹${task.reward}</p>
+                    <p><strong>Task Link:</strong> <a href="${task.link}" target="_blank">Open</a></p>
+                    <div class="help-content" style="background:#0f1222; padding:0.8rem; border-radius:16px;">${task.help_text || ''}</div>
+                    ${rejectionHtml}
+                    <hr>
+                    <h3>Complete the following</h3>
+                    ${fieldsHtml}
+                </div>
+            `,
+            width: '700px',
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Submit Task',
+            preConfirm: async () => {
+                let submissionData = {};
+                for(const field of customFields){
+                    const inputId = `field_${field.label.replace(/\s/g,'_')}`;
+                    const input = document.getElementById(inputId);
+                    if(field.type === 'file'){
+                        const file = input.files[0];
+                        if(field.required && !file){
+                            Swal.showValidationMessage(`${field.label} is required`);
+                            return false;
+                        }
+                        if(file){
+                            const fileName = `${Date.now()}_${file.name}`;
+                            const path = `task_submissions/${currentUser.id}/${task.id}/${fileName}`;
+                            const { data, error } = await supabase.storage.from('kyc_docs').upload(path, file);
+                            if(error){
+                                Swal.showValidationMessage(`Upload failed: ${error.message}`);
+                                return false;
+                            }
+                            submissionData[field.label] = data.path;
+                        }
+                    } else {
+                        const val = input.value;
+                        if(field.required && !val){
+                            Swal.showValidationMessage(`${field.label} is required`);
+                            return false;
+                        }
+                        submissionData[field.label] = val;
+                    }
+                }
+                return { submissionData };
+            },
+            didOpen: () => {
+                // preview for file inputs
+                for(const field of customFields){
+                    if(field.type === 'file'){
+                        const input = document.getElementById(`field_${field.label.replace(/\s/g,'_')}`);
+                        const preview = document.getElementById(`preview_${field.label.replace(/\s/g,'_')}`);
+                        if(input && preview){
+                            input.addEventListener('change', (e) => {
+                                if(e.target.files[0]){
+                                    const reader = new FileReader();
+                                    reader.onload = (ev) => {
+                                        preview.src = ev.target.result;
+                                        preview.style.display = 'block';
+                                    };
+                                    reader.readAsDataURL(e.target.files[0]);
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        });
+        if(formData){
+            // Insert or update submission
+            if(existing && existing.status === 'rejected'){
+                // Update existing submission
+                const { error } = await supabase.from('submissions').update({
+                    submission_data: formData.submissionData,
+                    status: 'pending',
+                    rejection_reason: null,
+                    started_at: new Date(),
+                    created_at: new Date()
+                }).eq('id', existing.id);
+                if(error) toast(error.message, "error");
+                else { toast("Task resubmitted for review!","success"); renderPanel('tasks'); }
+            } else {
+                // New submission
+                const { error } = await supabase.from('submissions').insert({
+                    uid: currentUser.id,
+                    task_id: task.id,
+                    submission_data: formData.submissionData,
+                    status: 'pending',
+                    reward: task.reward,
+                    started_at: new Date(),
+                    created_at: new Date()
+                });
+                if(error) toast(error.message, "error");
+                else { toast("Task submitted for review!","success"); renderPanel('tasks'); }
+            }
+        }
+    }
+
     function attachTaskEvents(){
         document.querySelectorAll('.toggleHelpBtn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -219,84 +352,9 @@
             });
         });
         document.querySelectorAll('.startTaskBtn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const taskId = btn.dataset.id;
-                const title = btn.dataset.title;
-                const reward = btn.dataset.reward;
-                const customFields = JSON.parse(btn.dataset.fields);
-                // Check if user already submitted this task
-                const { data: existing } = await supabase.from('submissions').select('id').eq('uid', currentUser.id).eq('task_id', taskId).maybeSingle();
-                if(existing){
-                    toast("You have already submitted this task. Pending approval or already completed.", "warning");
-                    return;
-                }
-                // Build dynamic form
-                let html = `<h3>${title}</h3><p>Reward: ₹${reward}</p>`;
-                for(const field of customFields){
-                    html += `<div style="margin-bottom:1rem;">
-                        <label>${field.label} ${field.required ? '*' : ''}</label>`;
-                    if(field.type === 'file'){
-                        html += `<input type="file" id="field_${field.label.replace(/\s/g,'_')}" ${field.required ? 'required' : ''}>`;
-                    } else {
-                        html += `<input type="${field.type}" id="field_${field.label.replace(/\s/g,'_')}" ${field.required ? 'required' : ''}>`;
-                    }
-                    html += `</div>`;
-                }
-                const { value: formData } = await Swal.fire({
-                    title: 'Complete Task',
-                    html: html,
-                    focusConfirm: false,
-                    preConfirm: async () => {
-                        let submissionData = {};
-                        let files = [];
-                        for(const field of customFields){
-                            const inputId = `field_${field.label.replace(/\s/g,'_')}`;
-                            const input = document.getElementById(inputId);
-                            if(field.type === 'file'){
-                                const file = input.files[0];
-                                if(field.required && !file){
-                                    Swal.showValidationMessage(`${field.label} is required`);
-                                    return false;
-                                }
-                                if(file){
-                                    // upload file to storage under task_submissions/userId/taskId/
-                                    const fileName = `${Date.now()}_${file.name}`;
-                                    const path = `task_submissions/${currentUser.id}/${taskId}/${fileName}`;
-                                    const { data, error } = await supabase.storage.from('kyc_docs').upload(path, file);
-                                    if(error){
-                                        Swal.showValidationMessage(`Upload failed: ${error.message}`);
-                                        return false;
-                                    }
-                                    submissionData[field.label] = data.path;
-                                    files.push(data.path);
-                                }
-                            } else {
-                                const val = input.value;
-                                if(field.required && !val){
-                                    Swal.showValidationMessage(`${field.label} is required`);
-                                    return false;
-                                }
-                                submissionData[field.label] = val;
-                            }
-                        }
-                        return { submissionData };
-                    }
-                });
-                if(formData){
-                    const { error } = await supabase.from('submissions').insert({
-                        uid: currentUser.id,
-                        task_id: taskId,
-                        submission_data: formData.submissionData,
-                        status: 'pending',
-                        reward: parseInt(reward),
-                        created_at: new Date()
-                    });
-                    if(error) toast(error.message, "error");
-                    else {
-                        toast("Task submitted for review!","success");
-                        renderPanel('tasks');
-                    }
-                }
+            btn.addEventListener('click', () => {
+                const task = JSON.parse(btn.dataset.task);
+                startTask(task);
             });
         });
     }
@@ -364,9 +422,7 @@
     }
 
     async function submitModernKyc(){
-        // (unchanged, same as previous version)
-        // For brevity, keep same logic as before – it works.
-        // I'll include a minimal working version.
+        // same as previous
         const aadhaarNum = document.getElementById('aadhaarNum').value;
         const panNum = document.getElementById('panNum').value;
         if(!aadhaarNum || !panNum) return toast("Aadhaar and PAN numbers required","error");
@@ -416,7 +472,7 @@
         } catch(err) { toast("Upload failed: "+err.message, "error"); }
     }
 
-    // ---------- Withdrawal with payment methods & KYC check ----------
+    // ---------- Withdrawal with payment methods ----------
     async function renderWithdraw(){
         const { data: methods } = await supabase.from('payment_methods').select('*').eq('uid', currentUser.id);
         return `
