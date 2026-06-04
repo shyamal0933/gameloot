@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* (same base styles as previous admin.html – keep unchanged) */
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
         body{background:#0a0c12;color:#eef2ff;}
         .admin-container{display:flex;min-height:100vh;}
@@ -41,6 +42,7 @@
         .field-value{ margin:0.5rem 0; border-left:2px solid cyan; padding-left:0.8rem; }
         .leaderboard-card { background:#0f172a; border-radius:24px; padding:1rem; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; }
         .rank { font-size:1.5rem; font-weight:bold; color:#00f2fe; width:50px; }
+        .fraud-warning { background:#7f1a1a; border-radius:16px; padding:0.5rem; margin-top:0.5rem; color:#ffaaaa; }
     </style>
 </head>
 <body>
@@ -112,7 +114,7 @@
     async function renderTasks(){
         const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
         return `<div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
-        <table><thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Custom Fields</th><th>Actions</th></tr></thead><tbody>
+        <tr><thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Custom Fields</th><th>Actions</th></tr></thead><tbody>
         ${tasks?.map(t => `<tr>
             <td>${t.title}</td>
             <td>₹${t.reward}</td>
@@ -262,7 +264,7 @@
     async function renderUsers(){
         const { data: users } = await supabase.from('profiles').select('*');
         return `<h2 class="section-title">User Management</h2>
-        <td><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+        <table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
         ${users?.map(u => `<tr>
             <td>${u.name||u.email}<br><small>${u.id}</small></td>
             <td>₹${u.balance||0}</td>
@@ -281,7 +283,7 @@
     async function renderWithdrawals(){
         const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Withdrawals</h2>
-        <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
+        </table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
         ${wd?.map(w => `<tr>
             <td>${w.profiles?.name}</td>
             <td>₹${w.amount}</td>
@@ -305,21 +307,69 @@
         `).join('') || '<p>No users yet.</p>'}</div>`;
     }
 
+    // ---------- Auto Fraud Scoring Function ----------
+    async function calculateFraudScore(userId, userData, allActivities) {
+        let score = 0;
+        const userActivity = allActivities.find(a => a.uid === userId);
+        if (!userActivity) return 0;
+        const signupIP = userActivity.signup_ip;
+        const fingerprint = userActivity.device_fingerprint;
+        const signupTime = new Date(userActivity.created_at);
+        
+        // Count occurrences of same IP across all users
+        const sameIPCount = allActivities.filter(a => a.signup_ip === signupIP && a.signup_ip).length;
+        if (sameIPCount > 1) score += (sameIPCount - 1) * 10; // +10 per extra account
+        
+        // Same device fingerprint
+        const sameFingerprintCount = allActivities.filter(a => a.device_fingerprint === fingerprint && a.device_fingerprint).length;
+        if (sameFingerprintCount > 1) score += (sameFingerprintCount - 1) * 15;
+        
+        // Rapid registrations from same IP within 10 minutes
+        const sameIPActivities = allActivities.filter(a => a.signup_ip === signupIP && a.created_at);
+        for (let i = 0; i < sameIPActivities.length; i++) {
+            const otherTime = new Date(sameIPActivities[i].created_at);
+            const diffMinutes = Math.abs((signupTime - otherTime) / 60000);
+            if (diffMinutes > 0 && diffMinutes < 10) {
+                score += 20;
+                break; // once detected, add once
+            }
+        }
+        
+        // Suspicious IP change (last login IP different from signup IP)
+        if (userActivity.last_login_ip && userActivity.last_login_ip !== signupIP) {
+            score += 5;
+        }
+        
+        // Cap at 100 for readability
+        return Math.min(score, 100);
+    }
+
     async function renderFraud(){
+        // Fetch all users and all user_activity
         const { data: users } = await supabase.from('profiles').select('id, name, email, fraud_score, account_status, last_login_at, created_at');
-        let html = `<h2 class="section-title">🛡️ Fraud Detection & User Activity</h2>`;
+        const { data: activities } = await supabase.from('user_activity').select('*');
+        if (!users || users.length === 0) return `<h2 class="section-title">🛡️ Fraud Detection</h2><p>No users yet.</p>`;
+        
+        let html = `<h2 class="section-title">🛡️ Fraud Detection & Risk Assessment</h2>
+        <p><i>System automatically calculates additional fraud points based on IP sharing, same device, rapid registrations, and IP changes. Scores > 50 suggest suspension.</i></p>`;
         for(const u of users){
-            const { data: activity } = await supabase.from('user_activity').select('ip_address, signup_ip, device_fingerprint').eq('uid', u.id).maybeSingle();
+            const autoScore = await calculateFraudScore(u.id, u, activities || []);
+            const totalScore = (u.fraud_score || 0) + autoScore;
+            const suggestion = totalScore > 50 ? `<div class="fraud-warning">⚠️ High risk (${totalScore} points). Consider suspending this user.</div>` : '';
+            const { data: activity } = await supabase.from('user_activity').select('ip_address, signup_ip, last_login_ip, device_fingerprint, created_at').eq('uid', u.id).maybeSingle();
             html += `<div class="kyc-review-card">
                 <h3>${u.name || u.email}</h3>
-                <p><strong>Fraud Score:</strong> ${u.fraud_score || 0} (higher = suspicious)</p>
+                <p><strong>Stored Fraud Score:</strong> ${u.fraud_score || 0}</p>
+                <p><strong>Auto-detected Risk:</strong> +${autoScore} points (total ${totalScore})</p>
                 <p><strong>Account Status:</strong> ${u.account_status}</p>
                 <p><strong>Signup IP:</strong> ${activity?.signup_ip || 'N/A'}</p>
-                <p><strong>Last Login IP:</strong> ${activity?.ip_address || 'N/A'}</p>
-                <p><strong>Device Fingerprint:</strong> ${activity?.device_fingerprint || 'N/A'}</p>
+                <p><strong>Last Login IP:</strong> ${activity?.last_login_ip || 'N/A'}</p>
+                <p><strong>Device Fingerprint:</strong> ${activity?.device_fingerprint ? activity.device_fingerprint.substring(0,30)+'...' : 'N/A'}</p>
+                <p><strong>Signup Time:</strong> ${activity?.created_at ? new Date(activity.created_at).toLocaleString() : 'N/A'}</p>
+                ${suggestion}
                 <div class="flex-btns">
-                    <button class="btn-sm increaseFraud" data-id="${u.id}">+ Increase Fraud Score</button>
-                    <button class="btn-sm btn-approve resetFraud" data-id="${u.id}">Reset Fraud Score</button>
+                    <button class="btn-sm increaseFraud" data-id="${u.id}">+ Increase Score</button>
+                    <button class="btn-sm btn-approve resetFraud" data-id="${u.id}">Reset Score</button>
                     <button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
                 </div>
             </div>`;
@@ -365,7 +415,6 @@
         const newBalance = (user.balance || 0) + reward;
         await supabase.from('profiles').update({ balance: newBalance }).eq('id', userId);
         await supabase.from('balance_history').insert({ uid: userId, amount_change: reward, new_balance: newBalance, reason: `Task approval (submission ${submissionId})`, created_by: currentAdmin.id });
-        // Update total_earnings
         await supabase.from('profiles').update({ total_earnings: supabase.sql`total_earnings + ${reward}` }).eq('id', userId);
         if (user.referred_by) {
             const commission = Math.floor(reward * 0.1);
@@ -377,7 +426,6 @@
                 await supabase.from('referral_commissions').insert({ referrer_uid: user.referred_by, referred_uid: userId, task_earning: reward, commission_amount: commission, task_id: taskId });
             }
         }
-        // In-app notification
         await supabase.from('notifications').insert({ uid: userId, title: 'Task Approved', message: `Your task submission has been approved! You earned ₹${reward}.`, created_at: new Date() });
     }
 
