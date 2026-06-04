@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GameLoot Admin | Advanced Task Management</title>
+    <title>GameLoot Admin | Full Control</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* (same styles as previous admin.html) */
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
         body{background:#0a0c12;color:#eef2ff;}
         .admin-container{display:flex;min-height:100vh;}
@@ -37,6 +38,7 @@
         .kyc-images-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:15px 0;}
         .kyc-image{background:#00000040;border-radius:16px;padding:8px;text-align:center;}
         .kyc-image img{max-width:100%;max-height:120px;border-radius:12px;cursor:pointer;}
+        .debug-info{background:#1e1e2e;border-radius:16px;padding:8px;margin-top:10px;font-size:11px;font-family:monospace;word-break:break-all;}
         .submission-detail{ background:#0f1222; padding:1rem; border-radius:16px; margin:0.5rem 0; }
         .field-value{ margin:0.5rem 0; border-left:2px solid cyan; padding-left:0.8rem; }
     </style>
@@ -105,7 +107,6 @@
         </div>`;
     }
 
-    // TASKS management (same as before, with custom fields)
     async function renderTasks(){
         const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
         return `<div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
@@ -117,7 +118,7 @@
             <td>${t.custom_fields?.length || 0} fields</td>
             <td><button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button><button class="btn-sm deleteTask" data-id="${t.id}">Delete</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
-        </tbody></tr>`;
+        </tbody></table>`;
     }
 
     function showTaskModal(task = null){
@@ -200,7 +201,6 @@
         return null;
     }
 
-    // SUBMISSIONS display with custom fields and admin actions
     async function renderSubmissions(){
         const { data: subs } = await supabase.from('submissions').select('*, tasks(title, custom_fields), profiles(name)').eq('status', 'pending');
         if(!subs?.length) return `<h2 class="section-title">Pending Submissions</h2><p>No pending submissions.</p>`;
@@ -215,7 +215,6 @@
                 for(const field of customFields){
                     const value = s.submission_data[field.label];
                     if(field.type === 'file' && value){
-                        // generate signed URL for file
                         const fileUrl = await getSignedUrl(value);
                         submissionHtml += `<div class="field-value"><strong>${field.label}:</strong> <a href="${fileUrl}" target="_blank">View File</a></div>`;
                     } else {
@@ -226,8 +225,8 @@
                 submissionHtml += `<div class="field-value">${s.proof || 'No data'}</div>`;
             }
             submissionHtml += `<div class="flex-btns" style="margin-top:1rem;">
-                <button class="btn-sm btn-approve approveSub" data-id="${s.id}" data-uid="${s.uid}" data-reward="${s.reward}">Approve</button>
-                <button class="btn-sm btn-reject rejectSub" data-id="${s.id}" data-task="${s.task_id}">Reject</button>
+                <button class="btn-sm btn-approve approveSub" data-id="${s.id}" data-uid="${s.uid}" data-reward="${s.reward}" data-task-id="${s.task_id}">Approve</button>
+                <button class="btn-sm btn-reject rejectSub" data-id="${s.id}">Reject</button>
                 <button class="btn-sm requestInfoSub" data-id="${s.id}" data-uid="${s.uid}">Request More Info</button>
             </div></div>`;
             html += submissionHtml;
@@ -235,8 +234,6 @@
         return html;
     }
 
-    // KYC, Users, Withdrawals, Chat – similar to previous version (omitted for brevity, but keep existing)
-    // I'll include minimal versions for completeness.
     async function renderKyc(){
         const { data: kycList } = await supabase.from('verifications').select('*').eq('status', 'pending');
         if(!kycList?.length) return `<h2 class="section-title">KYC Reviews</h2><p>No pending KYC requests.</p>`;
@@ -272,14 +269,14 @@
             <td>${u.account_status||'active'}</td>
             <td class="flex-btns"><button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button><button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button></td>
         </tr>`).join('')}
-        </tbody><table>`;
+        </tbody></table>`;
     }
 
     async function renderWithdrawals(){
         const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Withdrawals</h2>
         <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
-        ${wd?.map(w => `<tr>
+        ${wd?.map(w => `</td>
             <td>${w.profiles?.name}</td>
             <td>₹${w.amount}</td>
             <td>${w.method}</td>
@@ -320,17 +317,46 @@
         attachEvents();
     }
 
+    // ---------- Approval with referral handling ----------
+    async function approveSubmission(submissionId, userId, reward, taskId){
+        // Update submission status
+        await supabase.from('submissions').update({ status: 'approved' }).eq('id', submissionId);
+        // Get user's current balance
+        const { data: user } = await supabase.from('profiles').select('balance, referred_by').eq('id', userId).single();
+        const newBalance = (user.balance || 0) + reward;
+        await supabase.from('profiles').update({ balance: newBalance }).eq('id', userId);
+        await supabase.from('balance_history').insert({ uid: userId, amount_change: reward, new_balance: newBalance, reason: `Task approval (submission ${submissionId})`, created_by: currentAdmin.id });
+
+        // ----- 10% commission for referrer -----
+        if (user.referred_by) {
+            const commission = Math.floor(reward * 0.1);
+            if (commission > 0) {
+                const { data: referrer } = await supabase.from('profiles').select('balance').eq('id', user.referred_by).single();
+                const newRefBal = (referrer.balance || 0) + commission;
+                await supabase.from('profiles').update({ balance: newRefBal }).eq('id', user.referred_by);
+                await supabase.from('balance_history').insert({ uid: user.referred_by, amount_change: commission, new_balance: newRefBal, reason: `10% commission from referred user's task (submission ${submissionId})`, created_by: currentAdmin.id });
+                await supabase.from('referral_commissions').insert({
+                    referrer_uid: user.referred_by,
+                    referred_uid: userId,
+                    task_earning: reward,
+                    commission_amount: commission,
+                    task_id: taskId,
+                    created_at: new Date()
+                });
+                Swal.fire("Commission", `Referrer earned ₹${commission} commission.`, "info");
+            }
+        }
+    }
+
     function attachEvents(){
         document.getElementById('addTaskBtn')?.addEventListener('click', () => showTaskModal());
         document.querySelectorAll('.editTask').forEach(btn => btn.addEventListener('click', () => showTaskModal(JSON.parse(btn.dataset.task))));
         document.querySelectorAll('.deleteTask').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('tasks').delete().eq('id', btn.dataset.id); Swal.fire("Deleted"); loadTab(activeTab); }));
         
         document.querySelectorAll('.approveSub').forEach(btn => btn.addEventListener('click', async () => {
-            await supabase.from('submissions').update({ status: 'approved' }).eq('id', btn.dataset.id);
-            const { data: p } = await supabase.from('profiles').select('balance').eq('id', btn.dataset.uid).single();
-            const newBal = (p.balance || 0) + parseInt(btn.dataset.reward);
-            await supabase.from('profiles').update({ balance: newBal }).eq('id', btn.dataset.uid);
-            Swal.fire("Approved! Reward added."); loadTab(activeTab);
+            const id = btn.dataset.id, uid = btn.dataset.uid, reward = parseInt(btn.dataset.reward), taskId = btn.dataset.taskId;
+            await approveSubmission(id, uid, reward, taskId);
+            loadTab(activeTab);
         }));
         
         document.querySelectorAll('.rejectSub').forEach(btn => btn.addEventListener('click', async () => {
@@ -350,7 +376,43 @@
             }
         }));
         
-        document.querySelectorAll('.verifyKyc').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('verifications').update({ status: 'verified' }).eq('id', btn.dataset.id); await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', btn.dataset.uid); Swal.fire("KYC Approved"); loadTab(activeTab); }));
+        document.querySelectorAll('.verifyKyc').forEach(btn => btn.addEventListener('click', async () => {
+            const kycId = btn.dataset.id;
+            const userId = btn.dataset.uid;
+            await supabase.from('verifications').update({ status: 'verified' }).eq('id', kycId);
+            await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', userId);
+
+            // ---- KYC Bonus Logic ----
+            const { data: user } = await supabase.from('profiles').select('referred_by, kyc_bonus_received, referral_count, balance').eq('id', userId).single();
+            
+            // Bonus for the user themselves (₹50)
+            if (!user.kyc_bonus_received) {
+                const newBal = (user.balance || 0) + 50;
+                await supabase.from('profiles').update({ balance: newBal, kyc_bonus_received: true }).eq('id', userId);
+                await supabase.from('balance_history').insert({ uid: userId, amount_change: 50, new_balance: newBal, reason: 'KYC completion bonus', created_by: currentAdmin.id });
+                Swal.fire("Bonus!", "User received ₹50 for KYC completion.", "success");
+            }
+
+            // Bonus for referrer (if exists and within limit)
+            if (user.referred_by) {
+                const { data: referrer } = await supabase.from('profiles').select('referral_kyc_bonus_paid, referral_count, balance').eq('id', user.referred_by).single();
+                if (!referrer?.referral_kyc_bonus_paid && (referrer.referral_count || 0) < 100) {
+                    const newRefBal = (referrer.balance || 0) + 50;
+                    await supabase.from('profiles').update({ 
+                        balance: newRefBal, 
+                        referral_kyc_bonus_paid: true, 
+                        referral_count: (referrer.referral_count || 0) + 1,
+                        referral_earnings: (referrer.referral_earnings || 0) + 50
+                    }).eq('id', user.referred_by);
+                    await supabase.from('balance_history').insert({ uid: user.referred_by, amount_change: 50, new_balance: newRefBal, reason: `Referral bonus for user ${userId} completing KYC`, created_by: currentAdmin.id });
+                    Swal.fire("Bonus!", `Referrer received ₹50 for this referral.`, "success");
+                } else if ((referrer.referral_count || 0) >= 100) {
+                    Swal.fire("Limit reached", "Referrer has reached the maximum 100 referrals.", "warning");
+                }
+            }
+            loadTab(activeTab);
+        }));
+        
         document.querySelectorAll('.rejectKyc').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('verifications').update({ status: 'rejected' }).eq('id', btn.dataset.id); Swal.fire("Rejected"); loadTab(activeTab); }));
         document.querySelectorAll('.suspendUser').forEach(btn => btn.addEventListener('click', async () => { const newStatus = btn.dataset.status === 'suspended' ? 'active' : 'suspended'; await supabase.from('profiles').update({ account_status: newStatus }).eq('id', btn.dataset.id); Swal.fire(`User ${newStatus}`); loadTab(activeTab); }));
         document.querySelectorAll('.deleteUser').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('profiles').delete().eq('id', btn.dataset.id); Swal.fire("Deleted"); loadTab(activeTab); }));
