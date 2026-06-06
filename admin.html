@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* (same styles as previous admin.html) */
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
         body{background:#0a0c12;color:#eef2ff;}
         .admin-container{display:flex;min-height:100vh;}
@@ -112,34 +113,36 @@
         </div>`;
     }
 
-    // ==================== TASK MANAGEMENT (FULLY FIXED) ====================
+    // ==================== TASK MANAGEMENT ====================
     async function renderTasks(){
         const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
         return `<div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
         <div class="table-responsive">
-        <table><thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Fields</th><th>Actions</th></tr></thead><tbody>
-        ${tasks?.map(t => `
-            <tr>
-                <td>${escapeHtml(t.title)}</td>
-                <td>₹${t.reward}</td>
-                <td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td>
-                <td>${t.custom_fields?.length || 0}</td>
-                <td class="flex-btns">
-                    <button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button>
-                    <button class="btn-sm btn-reject deleteTask" data-id="${t.id}">Delete</button>
-                </td>
-            </tr>
-        `).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
-        </tbody><table>
+        <table>
+            <thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Fields</th><th>Actions</th></tr></thead>
+            <tbody>
+            ${tasks?.map(t => `
+                <tr>
+                    <td>${escapeHtml(t.title)}</td>
+                    <td>₹${t.reward}</td>
+                    <td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td>
+                    <td>${t.custom_fields?.length || 0}</td>
+                    <td class="flex-btns">
+                        <button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button>
+                        <button class="btn-sm btn-reject deleteTask" data-id="${t.id}">Delete</button>
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
+            </tbody>
+        </table>
         </div>`;
     }
 
-    function escapeHtml(str) { return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
 
     function showTaskModal(task = null){
         let customFields = task ? task.custom_fields || [] : [];
         window.tempFields = [...customFields];
-        
         Swal.fire({
             title: task ? 'Edit Task' : 'New Task',
             html: `
@@ -299,36 +302,46 @@
     async function renderUsers(){
         const { data: users } = await supabase.from('profiles').select('*');
         return `<h2 class="section-title">User Management</h2>
-        <table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-        ${users?.map(u => `<tr>
-            <td>${u.name||u.email}<br><small>${u.id}</small></td>
-            <td>₹${u.balance||0}</td>
-            <td>${u.verification_status||'pending'}</td>
-            <td>${u.fraud_score||0}</td>
-            <td>${u.account_status||'active'}</td>
-            <td class="flex-btns">
-                <button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
-                <button class="btn-sm sendNotif" data-id="${u.id}" data-name="${u.name||u.email}">Send Notification</button>
-                <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button>
-            </td>
-        </tr>`).join('')}
-        </tbody></table>`;
+        <table>
+            <thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+            ${users?.map(u => `
+                <tr>
+                    <td>${u.name||u.email}<br><small>${u.id}</small></td>
+                    <td>₹${u.balance||0}</td>
+                    <td>${u.verification_status||'pending'}</td>
+                    <td>${u.fraud_score||0}</td>
+                    <td>${u.account_status||'active'}</td>
+                    <td class="flex-btns">
+                        <button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
+                        <button class="btn-sm sendNotif" data-id="${u.id}" data-name="${u.name||u.email}">Send Notification</button>
+                        <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button>
+                    </td>
+                </tr>
+            `).join('')}
+            </tbody>
+        </table>`;
     }
 
     // ==================== WITHDRAWALS ====================
     async function renderWithdrawals(){
         const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Withdrawals</h2>
-        <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
-        ${wd?.map(w => `<tr>
-            <td>${w.profiles?.name}</td>
-            <td>₹${w.amount}</td>
-            <td>${w.method}</td>
-            <td>${w.details}</td>
-            <td><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
-            <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
-        </tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td><tr>'}
-        </tbody></table>`;
+        <table>
+            <thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead>
+            <tbody>
+            ${wd?.map(w => `
+                <tr>
+                    <td>${w.profiles?.name}</td>
+                    <td>₹${w.amount}</td>
+                    <td>${w.method}</td>
+                    <td>${w.details}</td>
+                    <td class="flex-btns"><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
+                    <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
+                </tr>
+            `).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
+            </tbody>
+        </table>`;
     }
 
     // ==================== LEADERBOARD ====================
@@ -352,21 +365,15 @@
         const signupIP = userActivity.signup_ip;
         const fingerprint = userActivity.device_fingerprint;
         const signupTime = new Date(userActivity.created_at);
-        
         const sameIPCount = allActivities.filter(a => a.signup_ip === signupIP && a.signup_ip).length;
         if (sameIPCount > 1) score += (sameIPCount - 1) * 10;
-        
         const sameFingerprintCount = allActivities.filter(a => a.device_fingerprint === fingerprint && a.device_fingerprint).length;
         if (sameFingerprintCount > 1) score += (sameFingerprintCount - 1) * 15;
-        
         const sameIPActivities = allActivities.filter(a => a.signup_ip === signupIP && a.created_at);
         for (let i = 0; i < sameIPActivities.length; i++) {
             const otherTime = new Date(sameIPActivities[i].created_at);
             const diffMinutes = Math.abs((signupTime - otherTime) / 60000);
-            if (diffMinutes > 0 && diffMinutes < 10) {
-                score += 20;
-                break;
-            }
+            if (diffMinutes > 0 && diffMinutes < 10) { score += 20; break; }
         }
         if (userActivity.last_login_ip && userActivity.last_login_ip !== signupIP) score += 5;
         return Math.min(score, 100);
@@ -436,6 +443,7 @@
         attachEvents();
     }
 
+    // Approval with commission and notification
     async function approveSubmission(submissionId, userId, reward, taskId){
         await supabase.from('submissions').update({ status: 'approved' }).eq('id', submissionId);
         const { data: user } = await supabase.from('profiles').select('balance, referred_by').eq('id', userId).single();
@@ -459,7 +467,38 @@
     function attachEvents(){
         document.getElementById('addTaskBtn')?.addEventListener('click', () => showTaskModal());
         document.querySelectorAll('.editTask').forEach(btn => btn.addEventListener('click', () => showTaskModal(JSON.parse(btn.dataset.task))));
-        document.querySelectorAll('.deleteTask').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('tasks').delete().eq('id', btn.dataset.id); Swal.fire("Deleted"); loadTab(activeTab); }));
+        
+        // ========== FIXED DELETE BUTTON ==========
+        document.querySelectorAll('.deleteTask').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const taskId = btn.dataset.id;
+                if (!taskId) {
+                    Swal.fire("Error", "No task ID found", "error");
+                    return;
+                }
+                const confirm = await Swal.fire({
+                    title: 'Delete Task?',
+                    text: 'This will permanently delete the task and all its submissions. This action cannot be undone.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Yes, delete it!'
+                });
+                if (confirm.isConfirmed) {
+                    const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+                    if (error) {
+                        Swal.fire("Error", error.message, "error");
+                    } else {
+                        Swal.fire("Deleted", "Task has been deleted.", "success");
+                        loadTab(activeTab);
+                    }
+                }
+            });
+        });
+        
+        // Approval and other events
         document.querySelectorAll('.approveSub').forEach(btn => btn.addEventListener('click', async () => { await approveSubmission(btn.dataset.id, btn.dataset.uid, parseInt(btn.dataset.reward), btn.dataset.taskId); loadTab(activeTab); }));
         document.querySelectorAll('.rejectSub').forEach(btn => btn.addEventListener('click', async () => { const { value: reason } = await Swal.fire({ title: 'Rejection Reason', input: 'textarea' }); if(reason) await supabase.from('submissions').update({ status: 'rejected', rejection_reason: reason }).eq('id', btn.dataset.id); loadTab(activeTab); }));
         document.querySelectorAll('.requestInfoSub').forEach(btn => btn.addEventListener('click', async () => { const { value: msg } = await Swal.fire({ title: 'Request Info', input: 'textarea' }); if(msg) await supabase.from('support_messages').insert({ uid: btn.dataset.uid, recipient_uid: btn.dataset.uid, message: `[Admin Request] ${msg}`, is_admin: true }); loadTab(activeTab); }));
@@ -471,6 +510,7 @@
         document.querySelectorAll('.sendNotif').forEach(btn => btn.addEventListener('click', async () => { const { value: notif } = await Swal.fire({ title: 'Send Notification', html: '<input id="notifTitle" placeholder="Title"><textarea id="notifMsg" placeholder="Message"></textarea>', preConfirm: () => ({ title: document.getElementById('notifTitle').value, msg: document.getElementById('notifMsg').value }) }); if(notif) await supabase.from('notifications').insert({ uid: btn.dataset.id, title: notif.title, message: notif.msg, created_at: new Date() }); loadTab(activeTab); }));
         document.querySelectorAll('.increaseFraud').forEach(btn => btn.addEventListener('click', async () => { const { data: p } = await supabase.from('profiles').select('fraud_score').eq('id', btn.dataset.id).single(); await supabase.from('profiles').update({ fraud_score: (p.fraud_score || 0) + 10 }).eq('id', btn.dataset.id); loadTab(activeTab); }));
         document.querySelectorAll('.resetFraud').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('profiles').update({ fraud_score: 0 }).eq('id', btn.dataset.id); loadTab(activeTab); }));
+        
         const sendBtn = document.getElementById('sendAdminReply');
         if(sendBtn){
             sendBtn.addEventListener('click', async () => {
