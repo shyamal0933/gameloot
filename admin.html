@@ -9,7 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* (same styles as previous admin.html) */
+        /* (same styles as previous – keep unchanged) */
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
         body{background:#0a0c12;color:#eef2ff;}
         .admin-container{display:flex;min-height:100vh;}
@@ -113,107 +113,45 @@
         </div>`;
     }
 
-    // ==================== TASK MANAGEMENT ====================
+    // ==================== TASK MANAGEMENT (FIXED) ====================
     async function renderTasks(){
         const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
         return `<div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
         <div class="table-responsive">
-        <table>
-            <thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Fields</th><th>Actions</th></tr></thead>
-            <tbody>
-            ${tasks?.map(t => `
-                <tr>
-                    <td>${escapeHtml(t.title)}</td>
-                    <td>₹${t.reward}</td>
-                    <td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td>
-                    <td>${t.custom_fields?.length || 0}</td>
-                    <td class="flex-btns">
-                        <button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button>
-                        <button class="btn-sm btn-reject deleteTask" data-id="${t.id}">Delete</button>
-                    </td>
-                </tr>
-            `).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
-            </tbody>
-        </table>
+        <table><thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Fields</th><th>Actions</th></tr></thead><tbody>
+        ${tasks?.map(t => `<tr>
+            <td>${escapeHtml(t.title)}</td>
+            <td>₹${t.reward}</td>
+            <td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td>
+            <td>${t.custom_fields?.length || 0}</td>
+            <td class="flex-btns">
+                <button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button>
+                <button class="btn-sm btn-reject deleteTask" data-id="${t.id}">Delete</button>
+            </td>
+        </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
+        </tbody></table>
         </div>`;
     }
 
     function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
 
-    function showTaskModal(task = null){
-        let customFields = task ? task.custom_fields || [] : [];
-        window.tempFields = [...customFields];
-        Swal.fire({
-            title: task ? 'Edit Task' : 'New Task',
-            html: `
-                <input id="taskTitle" value="${task?.title || ''}" placeholder="Task Title" class="swal2-input">
-                <textarea id="taskDesc" placeholder="Description" class="swal2-textarea">${task?.description || ''}</textarea>
-                <input id="taskReward" value="${task?.reward || ''}" placeholder="Reward Amount (₹)" class="swal2-input">
-                <input id="taskLink" value="${task?.link || ''}" placeholder="Task URL (https://...)" class="swal2-input">
-                <textarea id="helpText" placeholder="Help text (HTML allowed – images, links, etc.)" class="swal2-textarea">${task?.help_text || ''}</textarea>
-                <input id="deadline" type="datetime-local" value="${task?.deadline ? new Date(task.deadline).toISOString().slice(0,16) : ''}" class="swal2-input">
-                <div class="field-builder">
-                    <h4>Custom Fields (user must fill when completing task)</h4>
-                    <div id="fieldsList"></div>
-                    <button type="button" id="addFieldBtn" class="btn-sm">+ Add Field</button>
-                </div>
-            `,
-            focusConfirm: false,
-            width: '800px',
-            preConfirm: () => {
-                const title = document.getElementById('taskTitle').value.trim();
-                const description = document.getElementById('taskDesc').value;
-                const reward = parseInt(document.getElementById('taskReward').value);
-                const link = document.getElementById('taskLink').value.trim();
-                const help_text = document.getElementById('helpText').value;
-                const deadline = document.getElementById('deadline').value ? new Date(document.getElementById('deadline').value).toISOString() : null;
-                const fields = window.tempFields || [];
-                if(!title) Swal.showValidationMessage('Title required');
-                else if(isNaN(reward) || reward <= 0) Swal.showValidationMessage('Valid reward amount required');
-                else if(!link) Swal.showValidationMessage('Task URL required');
-                else return { title, description, reward, link, help_text, deadline, custom_fields: fields };
-            },
-            didOpen: () => {
-                renderFieldsList();
-                document.getElementById('addFieldBtn').addEventListener('click', async () => {
-                    const newField = await addFieldModal();
-                    if(newField) {
-                        window.tempFields.push(newField);
-                        renderFieldsList();
-                    }
-                });
-            }
-        }).then(async (result) => {
-            if(result.value){
-                const data = result.value;
-                if(task){
-                    const { error } = await supabase.from('tasks').update(data).eq('id', task.id);
-                    if(error) Swal.fire("Error", error.message, "error");
-                    else Swal.fire("Updated", "Task updated successfully", "success");
-                } else {
-                    const { error } = await supabase.from('tasks').insert({ ...data, created_at: new Date() });
-                    if(error) Swal.fire("Error", error.message, "error");
-                    else Swal.fire("Added", "Task added successfully", "success");
-                }
-                loadTab('tasks');
-            }
-        });
-    }
+    // Global variable to hold custom fields during modal editing
+    let tempCustomFields = [];
 
     function renderFieldsList(){
         const container = document.getElementById('fieldsList');
         if(!container) return;
-        container.innerHTML = window.tempFields.map((f, idx) => `
+        container.innerHTML = tempCustomFields.map((f, idx) => `
             <div class="field-item">
-                <input type="text" value="${f.label}" placeholder="Field Label" style="flex:2;" onchange="window.tempFields[${idx}].label = this.value">
-                <select onchange="window.tempFields[${idx}].type = this.value" style="flex:1;">
+                <input type="text" value="${escapeHtml(f.label)}" placeholder="Field Label" style="flex:2;" onchange="tempCustomFields[${idx}].label = this.value">
+                <select onchange="tempCustomFields[${idx}].type = this.value" style="flex:1;">
                     <option value="text" ${f.type==='text'?'selected':''}>Text</option>
                     <option value="email" ${f.type==='email'?'selected':''}>Email</option>
                     <option value="number" ${f.type==='number'?'selected':''}>Number</option>
                     <option value="file" ${f.type==='file'?'selected':''}>File Upload</option>
                 </select>
-                <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" ${f.required ? 'checked' : ''} onchange="window.tempFields[${idx}].required = this.checked"> Required</label>
-                <button class="btn-sm" onclick="window.tempFields.splice(${idx},1); renderFieldsList()">Remove</button>
+                <label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" ${f.required ? 'checked' : ''} onchange="tempCustomFields[${idx}].required = this.checked"> Required</label>
+                <button class="btn-sm" onclick="tempCustomFields.splice(${idx},1); renderFieldsList()">Remove</button>
             </div>
         `).join('');
     }
@@ -238,6 +176,73 @@
             }
         });
         return field;
+    }
+
+    function showTaskModal(task = null){
+        // Reset custom fields
+        tempCustomFields = task ? (task.custom_fields || []) : [];
+        Swal.fire({
+            title: task ? 'Edit Task' : 'New Task',
+            html: `
+                <input id="taskTitle" value="${task?.title || ''}" placeholder="Task Title" class="swal2-input">
+                <textarea id="taskDesc" placeholder="Description" class="swal2-textarea">${task?.description || ''}</textarea>
+                <input id="taskReward" value="${task?.reward || ''}" placeholder="Reward Amount (₹)" class="swal2-input">
+                <input id="taskLink" value="${task?.link || ''}" placeholder="Task URL (https://...)" class="swal2-input">
+                <textarea id="helpText" placeholder="Help text (HTML allowed – images, links, etc.)" class="swal2-textarea">${task?.help_text || ''}</textarea>
+                <input id="deadline" type="datetime-local" value="${task?.deadline ? new Date(task.deadline).toISOString().slice(0,16) : ''}" class="swal2-input">
+                <div class="field-builder">
+                    <h4>Custom Fields (user must fill when completing task)</h4>
+                    <div id="fieldsList"></div>
+                    <button type="button" id="addFieldBtn" class="btn-sm">+ Add Field</button>
+                </div>
+            `,
+            focusConfirm: false,
+            width: '800px',
+            preConfirm: () => {
+                const title = document.getElementById('taskTitle').value.trim();
+                const description = document.getElementById('taskDesc').value;
+                const reward = parseInt(document.getElementById('taskReward').value);
+                const link = document.getElementById('taskLink').value.trim();
+                const help_text = document.getElementById('helpText').value;
+                const deadline = document.getElementById('deadline').value ? new Date(document.getElementById('deadline').value).toISOString() : null;
+                // Validate custom fields: each must have a label
+                for (let i = 0; i < tempCustomFields.length; i++) {
+                    if (!tempCustomFields[i].label || tempCustomFields[i].label.trim() === '') {
+                        Swal.showValidationMessage(`Custom field #${i+1} has no label.`);
+                        return false;
+                    }
+                }
+                if(!title) Swal.showValidationMessage('Title required');
+                else if(isNaN(reward) || reward <= 0) Swal.showValidationMessage('Valid reward amount required');
+                else if(!link) Swal.showValidationMessage('Task URL required');
+                else return { title, description, reward, link, help_text, deadline, custom_fields: tempCustomFields };
+            },
+            didOpen: () => {
+                renderFieldsList();
+                document.getElementById('addFieldBtn').addEventListener('click', async () => {
+                    const newField = await addFieldModal();
+                    if(newField) {
+                        tempCustomFields.push(newField);
+                        renderFieldsList();
+                    }
+                });
+            }
+        }).then(async (result) => {
+            if(result.value){
+                const data = result.value;
+                console.log("Submitting task data:", data); // Debug
+                if(task){
+                    const { error } = await supabase.from('tasks').update(data).eq('id', task.id);
+                    if(error) Swal.fire("Error", error.message, "error");
+                    else Swal.fire("Updated", "Task updated successfully", "success");
+                } else {
+                    const { error } = await supabase.from('tasks').insert({ ...data, created_at: new Date() });
+                    if(error) Swal.fire("Error", error.message, "error");
+                    else Swal.fire("Added", "Task added successfully", "success");
+                }
+                loadTab('tasks');
+            }
+        });
     }
 
     // ==================== SUBMISSIONS ====================
@@ -302,46 +307,36 @@
     async function renderUsers(){
         const { data: users } = await supabase.from('profiles').select('*');
         return `<h2 class="section-title">User Management</h2>
-        <table>
-            <thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-            ${users?.map(u => `
-                <tr>
-                    <td>${u.name||u.email}<br><small>${u.id}</small></td>
-                    <td>₹${u.balance||0}</td>
-                    <td>${u.verification_status||'pending'}</td>
-                    <td>${u.fraud_score||0}</td>
-                    <td>${u.account_status||'active'}</td>
-                    <td class="flex-btns">
-                        <button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
-                        <button class="btn-sm sendNotif" data-id="${u.id}" data-name="${u.name||u.email}">Send Notification</button>
-                        <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button>
-                    </td>
-                </tr>
-            `).join('')}
-            </tbody>
-        </table>`;
+        <table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+        ${users?.map(u => `<tr>
+            <td>${u.name||u.email}<br><small>${u.id}</small></td>
+            <td>₹${u.balance||0}</td>
+            <td>${u.verification_status||'pending'}</td>
+            <td>${u.fraud_score||0}</td>
+            <td>${u.account_status||'active'}</td>
+            <td class="flex-btns">
+                <button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
+                <button class="btn-sm sendNotif" data-id="${u.id}" data-name="${u.name||u.email}">Send Notification</button>
+                <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button>
+            </td>
+        </tr>`).join('')}
+        </tbody><tr>`;
     }
 
     // ==================== WITHDRAWALS ====================
     async function renderWithdrawals(){
         const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Withdrawals</h2>
-        <table>
-            <thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead>
-            <tbody>
-            ${wd?.map(w => `
-                <tr>
-                    <td>${w.profiles?.name}</td>
-                    <td>₹${w.amount}</td>
-                    <td>${w.method}</td>
-                    <td>${w.details}</td>
-                    <td class="flex-btns"><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
-                    <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
-                </tr>
-            `).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
-            </tbody>
-        </table>`;
+        <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
+        ${wd?.map(w => `<tr>
+            <td>${w.profiles?.name}</td>
+            <td>₹${w.amount}</td>
+            <td>${w.method}</td>
+            <td>${w.details}</td>
+            <td class="flex-btns"><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
+            <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
+        </tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
+        </tbody></table>`;
     }
 
     // ==================== LEADERBOARD ====================
@@ -443,7 +438,6 @@
         attachEvents();
     }
 
-    // Approval with commission and notification
     async function approveSubmission(submissionId, userId, reward, taskId){
         await supabase.from('submissions').update({ status: 'approved' }).eq('id', submissionId);
         const { data: user } = await supabase.from('profiles').select('balance, referred_by').eq('id', userId).single();
@@ -467,38 +461,26 @@
     function attachEvents(){
         document.getElementById('addTaskBtn')?.addEventListener('click', () => showTaskModal());
         document.querySelectorAll('.editTask').forEach(btn => btn.addEventListener('click', () => showTaskModal(JSON.parse(btn.dataset.task))));
-        
-        // ========== FIXED DELETE BUTTON ==========
         document.querySelectorAll('.deleteTask').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const taskId = btn.dataset.id;
-                if (!taskId) {
-                    Swal.fire("Error", "No task ID found", "error");
-                    return;
-                }
+                if (!taskId) return Swal.fire("Error", "No task ID", "error");
                 const confirm = await Swal.fire({
                     title: 'Delete Task?',
-                    text: 'This will permanently delete the task and all its submissions. This action cannot be undone.',
+                    text: 'This will permanently delete the task and all its submissions.',
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#d33',
-                    cancelButtonColor: '#3085d6',
                     confirmButtonText: 'Yes, delete it!'
                 });
                 if (confirm.isConfirmed) {
                     const { error } = await supabase.from('tasks').delete().eq('id', taskId);
-                    if (error) {
-                        Swal.fire("Error", error.message, "error");
-                    } else {
-                        Swal.fire("Deleted", "Task has been deleted.", "success");
-                        loadTab(activeTab);
-                    }
+                    if (error) Swal.fire("Error", error.message, "error");
+                    else { Swal.fire("Deleted", "Task has been deleted.", "success"); loadTab(activeTab); }
                 }
             });
         });
-        
-        // Approval and other events
         document.querySelectorAll('.approveSub').forEach(btn => btn.addEventListener('click', async () => { await approveSubmission(btn.dataset.id, btn.dataset.uid, parseInt(btn.dataset.reward), btn.dataset.taskId); loadTab(activeTab); }));
         document.querySelectorAll('.rejectSub').forEach(btn => btn.addEventListener('click', async () => { const { value: reason } = await Swal.fire({ title: 'Rejection Reason', input: 'textarea' }); if(reason) await supabase.from('submissions').update({ status: 'rejected', rejection_reason: reason }).eq('id', btn.dataset.id); loadTab(activeTab); }));
         document.querySelectorAll('.requestInfoSub').forEach(btn => btn.addEventListener('click', async () => { const { value: msg } = await Swal.fire({ title: 'Request Info', input: 'textarea' }); if(msg) await supabase.from('support_messages').insert({ uid: btn.dataset.uid, recipient_uid: btn.dataset.uid, message: `[Admin Request] ${msg}`, is_admin: true }); loadTab(activeTab); }));
@@ -510,7 +492,6 @@
         document.querySelectorAll('.sendNotif').forEach(btn => btn.addEventListener('click', async () => { const { value: notif } = await Swal.fire({ title: 'Send Notification', html: '<input id="notifTitle" placeholder="Title"><textarea id="notifMsg" placeholder="Message"></textarea>', preConfirm: () => ({ title: document.getElementById('notifTitle').value, msg: document.getElementById('notifMsg').value }) }); if(notif) await supabase.from('notifications').insert({ uid: btn.dataset.id, title: notif.title, message: notif.msg, created_at: new Date() }); loadTab(activeTab); }));
         document.querySelectorAll('.increaseFraud').forEach(btn => btn.addEventListener('click', async () => { const { data: p } = await supabase.from('profiles').select('fraud_score').eq('id', btn.dataset.id).single(); await supabase.from('profiles').update({ fraud_score: (p.fraud_score || 0) + 10 }).eq('id', btn.dataset.id); loadTab(activeTab); }));
         document.querySelectorAll('.resetFraud').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('profiles').update({ fraud_score: 0 }).eq('id', btn.dataset.id); loadTab(activeTab); }));
-        
         const sendBtn = document.getElementById('sendAdminReply');
         if(sendBtn){
             sendBtn.addEventListener('click', async () => {
