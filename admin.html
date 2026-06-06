@@ -9,7 +9,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* (same styles as before – keep) */
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
         body{background:#0a0c12;color:#eef2ff;}
         .admin-container{display:flex;min-height:100vh;}
@@ -113,7 +112,7 @@
         </div>`;
     }
 
-    // ==================== TASK MANAGEMENT (FIXED) ====================
+    // ==================== TASK MANAGEMENT ====================
     let tempCustomFields = [];
 
     function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
@@ -184,7 +183,7 @@
                 const link = document.getElementById('taskLink').value.trim();
                 const help_text = document.getElementById('helpText').value;
                 const deadline = document.getElementById('deadline').value ? new Date(document.getElementById('deadline').value).toISOString() : null;
-                // Validate custom fields
+                // Validate custom fields: each must have a label
                 for (let i = 0; i < tempCustomFields.length; i++) {
                     if (!tempCustomFields[i].label || tempCustomFields[i].label.trim() === '') {
                         Swal.showValidationMessage(`Custom field #${i+1} has no label.`);
@@ -193,12 +192,8 @@
                 }
                 if(!title) Swal.showValidationMessage('Title required');
                 else if(isNaN(reward) || reward <= 0) Swal.showValidationMessage('Valid reward required');
-                else if(!link) Swal.showValidationMessage('Task URL is required');
-                else {
-                    const data = { title, description, reward, link, help_text, deadline, custom_fields: tempCustomFields };
-                    console.log("Submitting task data:", JSON.parse(JSON.stringify(data)));
-                    return data;
-                }
+                // else if(!link) Swal.showValidationMessage('Task URL required');
+                else return { title, description, reward, link, help_text, deadline, custom_fields: tempCustomFields };
             },
             didOpen: () => {
                 renderFieldsList();
@@ -210,25 +205,27 @@
         }).then(async (result) => {
             if(result.value){
                 const data = result.value;
+                console.log("Submitting task data:", JSON.stringify(data, null, 2));
                 if(task){
-                    const { error } = await supabase.from('tasks').update(data).eq('id', task.id);
+                    const { error, data: updated } = await supabase.from('tasks').update(data).eq('id', task.id).select();
                     if(error) {
                         console.error("Update error:", error);
                         Swal.fire("Error", error.message, "error");
                     } else {
+                        console.log("Updated task:", updated);
                         Swal.fire("Updated", "Task updated successfully", "success");
-                        loadTab('tasks');
                     }
                 } else {
-                    const { error } = await supabase.from('tasks').insert({ ...data, created_at: new Date() });
+                    const { error, data: inserted } = await supabase.from('tasks').insert({ ...data, created_at: new Date() }).select();
                     if(error) {
                         console.error("Insert error:", error);
                         Swal.fire("Error", error.message, "error");
                     } else {
+                        console.log("Inserted task:", inserted);
                         Swal.fire("Added", "Task created successfully", "success");
-                        loadTab('tasks');
                     }
                 }
+                loadTab('tasks');
             }
         });
     }
@@ -239,13 +236,11 @@
         <div class="table-responsive">
         <table><thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Fields</th><th>Actions</th></tr></thead><tbody>
         ${tasks?.map(t => `<tr>
-            <td>${escapeHtml(t.title)}</td>
-            <td>₹${t.reward}</td>
-            <td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td>
-            <td>${t.custom_fields?.length || 0}</td>
+            <td>${escapeHtml(t.title)}</td><td>₹${t.reward}</td><td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td><td>${t.custom_fields?.length || 0}</td>
             <td class="flex-btns"><button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button><button class="btn-sm btn-reject deleteTask" data-id="${t.id}">Delete</button></td>
-        </tr>`).join('') || '<tr><td colspan="5">No tasks</td><tr>'}
-        </tbody></table>
+        </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
+        </tbody>
+        </table>
         </div>`;
     }
 
@@ -312,13 +307,9 @@
     async function renderUsers(){
         const { data: users } = await supabase.from('profiles').select('*');
         return `<h2 class="section-title">User Management</h2>
-        <tr><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+        <table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
         ${users?.map(u => `<tr>
-            <td>${u.name||u.email}<br><small>${u.id}</small></td>
-            <td>₹${u.balance||0}</td>
-            <td>${u.verification_status||'pending'}</td>
-            <td>${u.fraud_score||0}</td>
-            <td>${u.account_status||'active'}</td>
+            <td>${u.name||u.email}<br><small>${u.id}</small></td><td>₹${u.balance||0}</td><td>${u.verification_status||'pending'}</td><td>${u.fraud_score||0}</td><td>${u.account_status||'active'}</td>
             <td class="flex-btns">
                 <button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
                 <button class="btn-sm sendNotif" data-id="${u.id}" data-name="${u.name||u.email}">Send Notification</button>
@@ -334,10 +325,7 @@
         return `<h2 class="section-title">Withdrawals</h2>
         <tr><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
         ${wd?.map(w => `<tr>
-            <td>${w.profiles?.name}</td>
-            <td>₹${w.amount}</td>
-            <td>${w.method}</td>
-            <td>${w.details}</td>
+            <td>${w.profiles?.name}</td><td>₹${w.amount}</td><td>${w.method}</td><td>${w.details}</td>
             <td class="flex-btns"><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
             <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
