@@ -183,7 +183,6 @@
                 const link = document.getElementById('taskLink').value.trim();
                 const help_text = document.getElementById('helpText').value;
                 const deadline = document.getElementById('deadline').value ? new Date(document.getElementById('deadline').value).toISOString() : null;
-                // Validate custom fields
                 for (let i = 0; i < tempCustomFields.length; i++) {
                     if (!tempCustomFields[i].label || tempCustomFields[i].label.trim() === '') {
                         Swal.showValidationMessage(`Custom field #${i+1} has no label.`);
@@ -204,15 +203,14 @@
         }).then(async (result) => {
             if(result.value){
                 const data = result.value;
-                console.log("Submitting task with custom fields:", data.custom_fields);
                 if(task){
                     const { error } = await supabase.from('tasks').update(data).eq('id', task.id);
                     if(error) Swal.fire("Error", error.message, "error");
-                    else Swal.fire("Updated", "Task updated successfully", "success");
+                    else Swal.fire("Updated", "Task updated", "success");
                 } else {
                     const { error } = await supabase.from('tasks').insert({ ...data, created_at: new Date() });
                     if(error) Swal.fire("Error", error.message, "error");
-                    else Swal.fire("Added", "Task created successfully", "success");
+                    else Swal.fire("Added", "Task created", "success");
                 }
                 loadTab('tasks');
             }
@@ -225,11 +223,13 @@
         <div class="table-responsive">
         <table><thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Fields</th><th>Actions</th></tr></thead><tbody>
         ${tasks?.map(t => `<tr>
-            <td>${escapeHtml(t.title)}</td><td>₹${t.reward}</td><td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td><td>${t.custom_fields?.length || 0}</td>
+            <td>${escapeHtml(t.title)}</td>
+            <td>₹${t.reward}</td>
+            <td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td>
+            <td>${t.custom_fields?.length || 0}</td>
             <td class="flex-btns"><button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button><button class="btn-sm btn-reject deleteTask" data-id="${t.id}">Delete</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
-        </tbody>
-        </table>
+        </tbody></table>
         </div>`;
     }
 
@@ -286,7 +286,17 @@
             const panBackSelfieUrl = await getSignedUrl(k.pan_back_selfie);
             const hdPicUrl = await getSignedUrl(k.user_hd_pic);
             html += `<div class="kyc-review-card"><h3>${userName}</h3><p><strong>Aadhaar:</strong> ${k.aadhaar_number||'-'}</p><p><strong>PAN:</strong> ${k.pan_number||'-'}</p>
-            <div class="kyc-images-grid">${aadFrontUrl?`<div class="kyc-image"><img src="${aadFrontUrl}"><br>Aadhaar Front</div>`:''}${aadBackUrl?`<div class="kyc-image"><img src="${aadBackUrl}"><br>Aadhaar Back</div>`:''}${aadFrontSelfieUrl?`<div class="kyc-image"><img src="${aadFrontSelfieUrl}"><br>Front Selfie</div>`:''}${aadBackSelfieUrl?`<div class="kyc-image"><img src="${aadBackSelfieUrl}"><br>Back Selfie</div>`:''}${panFrontDocUrl?`<div class="kyc-image"><img src="${panFrontDocUrl}"><br>PAN Front</div>`:''}${panBackDocUrl?`<div class="kyc-image"><img src="${panBackDocUrl}"><br>PAN Back</div>`:''}${panFrontSelfieUrl?`<div class="kyc-image"><img src="${panFrontSelfieUrl}"><br>PAN Front Selfie</div>`:''}${panBackSelfieUrl?`<div class="kyc-image"><img src="${panBackSelfieUrl}"><br>PAN Back Selfie</div>`:''}${hdPicUrl?`<div class="kyc-image"><img src="${hdPicUrl}"><br>HD Pic</div>`:''}</div>
+            <div class="kyc-images-grid">
+                ${aadFrontUrl?`<div class="kyc-image"><img src="${aadFrontUrl}"><br>Aadhaar Front</div>`:'<div class="kyc-image">❌ Aadhaar Front missing</div>'}
+                ${aadBackUrl?`<div class="kyc-image"><img src="${aadBackUrl}"><br>Aadhaar Back</div>`:'<div class="kyc-image">❌ Aadhaar Back missing</div>'}
+                ${aadFrontSelfieUrl?`<div class="kyc-image"><img src="${aadFrontSelfieUrl}"><br>Aadhaar Front Selfie</div>`:'<div class="kyc-image">❌ Aadhaar Front Selfie missing</div>'}
+                ${aadBackSelfieUrl?`<div class="kyc-image"><img src="${aadBackSelfieUrl}"><br>Aadhaar Back Selfie</div>`:'<div class="kyc-image">❌ Aadhaar Back Selfie missing</div>'}
+                ${panFrontDocUrl?`<div class="kyc-image"><img src="${panFrontDocUrl}"><br>PAN Front</div>`:'<div class="kyc-image">❌ PAN Front missing</div>'}
+                ${panBackDocUrl?`<div class="kyc-image"><img src="${panBackDocUrl}"><br>PAN Back</div>`:'<div class="kyc-image">❌ PAN Back missing</div>'}
+                ${panFrontSelfieUrl?`<div class="kyc-image"><img src="${panFrontSelfieUrl}"><br>PAN Front Selfie</div>`:'<div class="kyc-image">❌ PAN Front Selfie missing</div>'}
+                ${panBackSelfieUrl?`<div class="kyc-image"><img src="${panBackSelfieUrl}"><br>PAN Back Selfie</div>`:'<div class="kyc-image">❌ PAN Back Selfie missing</div>'}
+                ${hdPicUrl?`<div class="kyc-image"><img src="${hdPicUrl}"><br>HD Pic</div>`:'<div class="kyc-image">❌ HD Pic missing</div>'}
+            </div>
             <div class="flex-btns"><button class="btn-sm btn-approve verifyKyc" data-id="${k.id}" data-uid="${k.uid}">Approve KYC</button><button class="btn-sm btn-reject rejectKyc" data-id="${k.id}">Reject KYC</button></div></div>`;
         }
         return html;
@@ -298,14 +308,18 @@
         return `<h2 class="section-title">User Management</h2>
         <table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
         ${users?.map(u => `<tr>
-            <td>${u.name||u.email}<br><small>${u.id}</small></td><td>₹${u.balance||0}</td><td>${u.verification_status||'pending'}</td><td>${u.fraud_score||0}</td><td>${u.account_status||'active'}</td>
+            <td>${u.name||u.email}<br><small>${u.id}</small></td>
+            <td>₹${u.balance||0}</td>
+            <td>${u.verification_status||'pending'}</td>
+            <td>${u.fraud_score||0}</td>
+            <td>${u.account_status||'active'}</td>
             <td class="flex-btns">
                 <button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
                 <button class="btn-sm sendNotif" data-id="${u.id}" data-name="${u.name||u.email}">Send Notification</button>
                 <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button>
             </td>
         </tr>`).join('')}
-        </tbody></table>`;
+        </tbody></tr>`;
     }
 
     // ==================== WITHDRAWALS ====================
@@ -314,8 +328,12 @@
         return `<h2 class="section-title">Withdrawals</h2>
         <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
         ${wd?.map(w => `<tr>
-            <td>${w.profiles?.name}</td><td>₹${w.amount}</td><td>${w.method}</td><td>${w.details}</td>
-            <td class="flex-btns"><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button><button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
+            <td>${w.profiles?.name}</td>
+            <td>₹${w.amount}</td>
+            <td>${w.method}</td>
+            <td>${w.details}</td>
+            <td class="flex-btns"><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
+            <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
         </tbody></table>`;
     }
@@ -333,9 +351,23 @@
         `).join('') || '<p>No users yet.</p>'}</div>`;
     }
 
-    // ==================== FRAUD DETECTION (simplified placeholder) ====================
+    // ==================== FRAUD DETECTION (simplified) ====================
     async function renderFraud(){
-        return `<h2 class="section-title">🛡️ Fraud Detection</h2><p>Coming soon – integrated with user activity.</p>`;
+        const { data: users } = await supabase.from('profiles').select('id, name, email, fraud_score, account_status');
+        let html = `<h2 class="section-title">🛡️ Fraud Detection</h2><p>Admin can manually adjust fraud scores.</p>`;
+        for(const u of users){
+            html += `<div class="kyc-review-card">
+                <h3>${u.name || u.email}</h3>
+                <p><strong>Fraud Score:</strong> ${u.fraud_score || 0}</p>
+                <p><strong>Account Status:</strong> ${u.account_status}</p>
+                <div class="flex-btns">
+                    <button class="btn-sm increaseFraud" data-id="${u.id}">+ Increase Score</button>
+                    <button class="btn-sm btn-approve resetFraud" data-id="${u.id}">Reset Score</button>
+                    <button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
+                </div>
+            </div>`;
+        }
+        return html;
     }
 
     // ==================== CHAT ====================
@@ -424,6 +456,8 @@
         document.querySelectorAll('.approveWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', btn.dataset.id); await supabase.from('notifications').insert({ uid: btn.dataset.uid, title: 'Withdrawal Approved', message: `Your withdrawal of ₹${btn.dataset.amount} has been approved.` }); loadTab(activeTab); }));
         document.querySelectorAll('.rejectWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'rejected' }).eq('id', btn.dataset.id); loadTab(activeTab); }));
         document.querySelectorAll('.sendNotif').forEach(btn => btn.addEventListener('click', async () => { const { value: notif } = await Swal.fire({ title: 'Send Notification', html: '<input id="notifTitle" placeholder="Title"><textarea id="notifMsg" placeholder="Message"></textarea>', preConfirm: () => ({ title: document.getElementById('notifTitle').value, msg: document.getElementById('notifMsg').value }) }); if(notif) await supabase.from('notifications').insert({ uid: btn.dataset.id, title: notif.title, message: notif.msg, created_at: new Date() }); loadTab(activeTab); }));
+        document.querySelectorAll('.increaseFraud').forEach(btn => btn.addEventListener('click', async () => { const { data: p } = await supabase.from('profiles').select('fraud_score').eq('id', btn.dataset.id).single(); await supabase.from('profiles').update({ fraud_score: (p.fraud_score || 0) + 10 }).eq('id', btn.dataset.id); loadTab(activeTab); }));
+        document.querySelectorAll('.resetFraud').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('profiles').update({ fraud_score: 0 }).eq('id', btn.dataset.id); loadTab(activeTab); }));
         const sendBtn = document.getElementById('sendAdminReply');
         if(sendBtn){
             sendBtn.addEventListener('click', async () => {
