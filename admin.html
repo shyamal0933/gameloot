@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* (same styles as previous admin.html – keep unchanged) */
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
         body{background:#0a0c12;color:#eef2ff;}
         .admin-container{display:flex;min-height:100vh;}
@@ -229,7 +230,7 @@
             <td>${t.custom_fields?.length || 0}</td>
             <td class="flex-btns"><button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button><button class="btn-sm btn-reject deleteTask" data-id="${t.id}">Delete</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
-        </tbody></table>
+        </tbody></tr>
         </div>`;
     }
 
@@ -268,7 +269,7 @@
         return html;
     }
 
-    // ==================== KYC ====================
+    // ==================== KYC with ₹50 bonus ====================
     async function renderKyc(){
         const { data: kycList } = await supabase.from('verifications').select('*').eq('status', 'pending');
         if(!kycList?.length) return `<h2 class="section-title">KYC Reviews</h2><p>No pending KYC requests.</p>`;
@@ -302,7 +303,7 @@
         return html;
     }
 
-    // ==================== USERS ====================
+    // ==================== USER MANAGEMENT (with balance adjustment) ====================
     async function renderUsers(){
         const { data: users } = await supabase.from('profiles').select('*');
         return `<h2 class="section-title">User Management</h2>
@@ -314,12 +315,13 @@
             <td>${u.fraud_score||0}</td>
             <td>${u.account_status||'active'}</td>
             <td class="flex-btns">
+                <button class="btn-sm adjustBalance" data-id="${u.id}" data-name="${u.name||u.email}">Adjust Balance</button>
                 <button class="btn-sm suspendUser" data-id="${u.id}" data-status="${u.account_status}">${u.account_status==='suspended'?'Unsuspend':'Suspend'}</button>
                 <button class="btn-sm sendNotif" data-id="${u.id}" data-name="${u.name||u.email}">Send Notification</button>
                 <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button>
             </td>
         </tr>`).join('')}
-        </tbody></tr>`;
+        </tbody></table>`;
     }
 
     // ==================== WITHDRAWALS ====================
@@ -335,7 +337,7 @@
             <td class="flex-btns"><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
             <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
-        </tbody></table>`;
+        </tbody><tr>`;
     }
 
     // ==================== LEADERBOARD ====================
@@ -351,7 +353,7 @@
         `).join('') || '<p>No users yet.</p>'}</div>`;
     }
 
-    // ==================== FRAUD DETECTION (simplified) ====================
+    // ==================== FRAUD DETECTION ====================
     async function renderFraud(){
         const { data: users } = await supabase.from('profiles').select('id, name, email, fraud_score, account_status');
         let html = `<h2 class="section-title">🛡️ Fraud Detection</h2><p>Admin can manually adjust fraud scores.</p>`;
@@ -410,6 +412,8 @@
         await supabase.from('profiles').update({ balance: newBalance }).eq('id', userId);
         await supabase.from('balance_history').insert({ uid: userId, amount_change: reward, new_balance: newBalance, reason: `Task approval (submission ${submissionId})`, created_by: currentAdmin.id });
         await supabase.from('profiles').update({ total_earnings: supabase.sql`total_earnings + ${reward}` }).eq('id', userId);
+        
+        // 10% commission for referrer
         if (user.referred_by) {
             const commission = Math.floor(reward * 0.1);
             if (commission > 0) {
@@ -449,8 +453,79 @@
             if(msg) await supabase.from('support_messages').insert({ uid: btn.dataset.uid, recipient_uid: btn.dataset.uid, message: `[Admin Request] ${msg}`, is_admin: true });
             loadTab(activeTab);
         }));
-        document.querySelectorAll('.verifyKyc').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('verifications').update({ status: 'verified' }).eq('id', btn.dataset.id); await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', btn.dataset.uid); await supabase.from('notifications').insert({ uid: btn.dataset.uid, title: 'KYC Approved', message: 'Your KYC has been approved! You can now withdraw.' }); loadTab(activeTab); }));
+        
+        // ========== KYC APPROVAL with ₹50 bonus to user and referrer ==========
+        document.querySelectorAll('.verifyKyc').forEach(btn => btn.addEventListener('click', async () => {
+            const kycId = btn.dataset.id;
+            const userId = btn.dataset.uid;
+            await supabase.from('verifications').update({ status: 'verified' }).eq('id', kycId);
+            await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', userId);
+            
+            // ₹50 bonus for the user themselves
+            const { data: user } = await supabase.from('profiles').select('balance, kyc_bonus_received, referred_by').eq('id', userId).single();
+            if (!user.kyc_bonus_received) {
+                const newBalance = (user.balance || 0) + 50;
+                await supabase.from('profiles').update({ balance: newBalance, kyc_bonus_received: true }).eq('id', userId);
+                await supabase.from('balance_history').insert({ uid: userId, amount_change: 50, new_balance: newBalance, reason: 'KYC completion bonus', created_by: currentAdmin.id });
+                
+                // ₹50 bonus for referrer (if exists and not already paid for this referred user)
+                if (user.referred_by) {
+                    const { data: referrer } = await supabase.from('profiles').select('balance, referral_count, referral_kyc_bonus_paid, referral_earnings').eq('id', user.referred_by).single();
+                    if (!referrer.referral_kyc_bonus_paid && (referrer.referral_count || 0) < 100) {
+                        const newRefBal = (referrer.balance || 0) + 50;
+                        await supabase.from('profiles').update({
+                            balance: newRefBal,
+                            referral_count: (referrer.referral_count || 0) + 1,
+                            referral_kyc_bonus_paid: true,
+                            referral_earnings: (referrer.referral_earnings || 0) + 50
+                        }).eq('id', user.referred_by);
+                        await supabase.from('balance_history').insert({ uid: user.referred_by, amount_change: 50, new_balance: newRefBal, reason: `Referral bonus for user ${userId} completing KYC`, created_by: currentAdmin.id });
+                    }
+                }
+                await supabase.from('notifications').insert({ uid: userId, title: 'KYC Approved', message: 'Your KYC has been approved! You received ₹50 bonus.' });
+                if (user.referred_by) {
+                    await supabase.from('notifications').insert({ uid: user.referred_by, title: 'Referral Bonus', message: `Your referred user completed KYC! You earned ₹50.` });
+                }
+            }
+            loadTab(activeTab);
+        }));
+        
         document.querySelectorAll('.rejectKyc').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('verifications').update({ status: 'rejected' }).eq('id', btn.dataset.id); loadTab(activeTab); }));
+        
+        // ========== USER MANAGEMENT ACTIONS ==========
+        document.querySelectorAll('.adjustBalance').forEach(btn => btn.addEventListener('click', async () => {
+            const userId = btn.dataset.id;
+            const userName = btn.dataset.name;
+            const { value: amount } = await Swal.fire({
+                title: `Adjust Balance for ${userName}`,
+                html: `<input type="number" id="amount" placeholder="Amount (+ to add, - to subtract)" class="swal2-input">
+                       <input id="reason" placeholder="Reason (optional)" class="swal2-input">`,
+                focusConfirm: false,
+                preConfirm: () => {
+                    const amt = parseInt(document.getElementById('amount').value);
+                    if(isNaN(amt)) Swal.showValidationMessage('Enter a valid number');
+                    return { amount: amt, reason: document.getElementById('reason').value };
+                }
+            });
+            if(amount && amount.amount !== 0){
+                const { data: user } = await supabase.from('profiles').select('balance').eq('id', userId).single();
+                const newBalance = (user.balance || 0) + amount.amount;
+                const { error } = await supabase.from('profiles').update({ balance: newBalance }).eq('id', userId);
+                if(error) toast(error.message, "error");
+                else {
+                    await supabase.from('balance_history').insert({
+                        uid: userId,
+                        amount_change: amount.amount,
+                        new_balance: newBalance,
+                        reason: `Admin adjustment: ${amount.reason || 'No reason'}`,
+                        created_by: currentAdmin.id
+                    });
+                    toast(`Balance updated to ₹${newBalance}`, "success");
+                    loadTab(activeTab);
+                }
+            }
+        }));
+        
         document.querySelectorAll('.suspendUser').forEach(btn => btn.addEventListener('click', async () => { const newStatus = btn.dataset.status === 'suspended' ? 'active' : 'suspended'; await supabase.from('profiles').update({ account_status: newStatus }).eq('id', btn.dataset.id); loadTab(activeTab); }));
         document.querySelectorAll('.deleteUser').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('profiles').delete().eq('id', btn.dataset.id); loadTab(activeTab); }));
         document.querySelectorAll('.approveWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', btn.dataset.id); await supabase.from('notifications').insert({ uid: btn.dataset.uid, title: 'Withdrawal Approved', message: `Your withdrawal of ₹${btn.dataset.amount} has been approved.` }); loadTab(activeTab); }));
