@@ -230,7 +230,7 @@
             <td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td>
             <td>${t.custom_fields?.length || 0}</td>
             <td class="flex-btns"><button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button><button class="btn-sm btn-reject deleteTask" data-id="${t.id}">Delete</button></td>
-        </tr>`).join('') || '<tr><td colspan="5">No tasks</td></table>'}
+        </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
         </tbody></table>
         </div>`;
     }
@@ -322,14 +322,14 @@
                 <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button>
             </td>
         </tr>`).join('')}
-        </tbody></table>`;
+        </tbody></td>`;
     }
 
-    // ==================== WITHDRAWALS ====================
+    // ==================== WITHDRAWALS (deducted already, refund on reject) ====================
     async function renderWithdrawals(){
         const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Withdrawals</h2>
-        </table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
+        <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
         ${wd?.map(w => `<tr>
             <td>${w.profiles?.name}</td>
             <td>₹${w.amount}</td>
@@ -338,27 +338,15 @@
             <td class="flex-btns"><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
             <button class="btn-sm btn-reject rejectWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Reject</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
-        </tbody></tr>`;
+        </tbody></table>`;
     }
 
-    // ==================== TRANSACTIONS (ADMIN VIEW ALL USERS) ====================
+    // ==================== TRANSACTIONS (ALL USERS) ====================
     async function renderTransactions(){
-        // Fetch all balance_history with user profile
-        const { data: allHistory } = await supabase
-            .from('balance_history')
-            .select('*, profiles(name, email)')
-            .order('created_at', { ascending: false })
-            .limit(200);
-        // Fetch all withdrawals with user profile
-        const { data: allWithdrawals } = await supabase
-            .from('withdrawals')
-            .select('*, profiles(name, email)')
-            .order('created_at', { ascending: false })
-            .limit(200);
-        
+        const { data: allHistory } = await supabase.from('balance_history').select('*, profiles(name, email)').order('created_at', { ascending: false }).limit(200);
+        const { data: allWithdrawals } = await supabase.from('withdrawals').select('*, profiles(name, email)').order('created_at', { ascending: false }).limit(200);
         let html = `<h2 class="section-title">📊 All User Transactions</h2>`;
-        
-        html += `<h3>💰 Balance Changes (All Users)</h3><div>`;
+        html += `<h3>💰 Balance Changes</h3><div>`;
         for(const entry of allHistory || []){
             const sign = entry.amount_change >= 0 ? '+' : '';
             const color = entry.amount_change >= 0 ? '#10b981' : '#ef4444';
@@ -370,7 +358,7 @@
             </div>`;
         }
         if(!allHistory?.length) html += `<p>No balance changes recorded.</p>`;
-        html += `</div><h3>🏧 Withdrawal Requests (All Users)</h3><div>`;
+        html += `</div><h3>🏧 Withdrawal Requests</h3><div>`;
         for(const w of allWithdrawals || []){
             const statusColor = w.status === 'approved' ? '#10b981' : (w.status === 'pending' ? '#f59e0b' : '#ef4444');
             html += `<div class="transaction-row">
@@ -504,7 +492,6 @@
             const userId = btn.dataset.uid;
             await supabase.from('verifications').update({ status: 'verified' }).eq('id', kycId);
             await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', userId);
-            
             const { data: user } = await supabase.from('profiles').select('balance, kyc_bonus_received, referred_by').eq('id', userId).single();
             if (!user.kyc_bonus_received) {
                 const newBalance = (user.balance || 0) + 100;
@@ -542,8 +529,7 @@
             const userName = btn.dataset.name;
             const { value: amount } = await Swal.fire({
                 title: `Adjust Balance for ${userName}`,
-                html: `<input type="number" id="amount" placeholder="Amount (+ to add, - to subtract)" class="swal2-input">
-                       <input id="reason" placeholder="Reason (optional)" class="swal2-input">`,
+                html: `<input id="amount" type="number" placeholder="Amount (+ to add, - to subtract)" class="swal2-input"><input id="reason" placeholder="Reason (optional)" class="swal2-input">`,
                 focusConfirm: false,
                 preConfirm: () => {
                     const amt = parseInt(document.getElementById('amount').value);
@@ -557,13 +543,7 @@
                 const { error } = await supabase.from('profiles').update({ balance: newBalance }).eq('id', userId);
                 if(error) toast(error.message, "error");
                 else {
-                    await supabase.from('balance_history').insert({
-                        uid: userId,
-                        amount_change: amount.amount,
-                        new_balance: newBalance,
-                        reason: `Admin adjustment: ${amount.reason || 'No reason'}`,
-                        created_by: currentAdmin.id
-                    });
+                    await supabase.from('balance_history').insert({ uid: userId, amount_change: amount.amount, new_balance: newBalance, reason: `Admin adjustment: ${amount.reason || 'No reason'}`, created_by: currentAdmin.id });
                     toast(`Balance updated to ₹${newBalance}`, "success");
                     loadTab(activeTab);
                 }
