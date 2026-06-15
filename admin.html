@@ -34,7 +34,6 @@
         input,textarea,select{background:#1f2937;border:1px solid #374151;padding:10px;border-radius:20px;color:white;width:100%;margin:8px 0;}
         @media (max-width:768px){.sidebar{width:80px;padding:1rem 0.5rem;}.sidebar .logo{font-size:1rem;}.nav-item span{display:none;}.main-content{margin-left:80px;}}
         .kyc-review-card{background:#0f172a;border-radius:24px;padding:1.2rem;margin-bottom:1.2rem;border:1px solid #2a3a5a;}
-        .kyc-images-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:15px 0;}
         .kyc-image{background:#00000040;border-radius:16px;padding:8px;text-align:center;}
         .kyc-image img{max-width:100%;max-height:120px;border-radius:12px;cursor:pointer;}
         .submission-detail{ background:#0f1222; padding:1rem; border-radius:16px; margin:0.5rem 0; }
@@ -222,8 +221,7 @@
     async function renderTasks(){
         const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
         return `<div style="display:flex; justify-content:space-between;"><h2 class="section-title">Manage Tasks</h2><button id="addTaskBtn"><i class="fas fa-plus"></i> Add Task</button></div>
-        <div class="table-responsive">
-        <table><thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Fields</th><th>Actions</th></tr></thead><tbody>
+        <div class="table-responsive"><table><thead><tr><th>Title</th><th>Reward</th><th>Deadline</th><th>Fields</th><th>Actions</th></tr></thead><tbody>
         ${tasks?.map(t => `<tr>
             <td>${escapeHtml(t.title)}</td>
             <td>₹${t.reward}</td>
@@ -231,8 +229,7 @@
             <td>${t.custom_fields?.length || 0}</td>
             <td class="flex-btns"><button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button><button class="btn-sm btn-reject deleteTask" data-id="${t.id}">Delete</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
-        </tbody></table>
-        </div>`;
+        </tbody></table></div>`;
     }
 
     // ==================== SUBMISSIONS ====================
@@ -270,7 +267,7 @@
         return html;
     }
 
-    // ==================== KYC ====================
+    // ==================== KYC (shows personal info + Aadhaar + selfie) ====================
     async function renderKyc(){
         const { data: kycList } = await supabase.from('verifications').select('*').eq('status', 'pending');
         if(!kycList?.length) return `<h2 class="section-title">KYC Reviews</h2><p>No pending KYC requests.</p>`;
@@ -278,37 +275,25 @@
         for(const k of kycList){
             const {data:prof}=await supabase.from('profiles').select('name,email').eq('id',k.uid).single();
             const userName = prof?.name || prof?.email || k.uid;
-            const aadFrontUrl = await getSignedUrl(k.aadhaar_front);
-            const aadBackUrl = await getSignedUrl(k.aadhaar_back);
-            const aadFrontSelfieUrl = await getSignedUrl(k.aadhaar_front_selfie);
-            const aadBackSelfieUrl = await getSignedUrl(k.aadhaar_back_selfie);
-            const panFrontDocUrl = await getSignedUrl(k.pan_front_doc);
-            const panBackDocUrl = await getSignedUrl(k.pan_back_doc);
-            const panFrontSelfieUrl = await getSignedUrl(k.pan_front_selfie);
-            const panBackSelfieUrl = await getSignedUrl(k.pan_back_selfie);
-            const hdPicUrl = await getSignedUrl(k.user_hd_pic);
-            html += `<div class="kyc-review-card"><h3>${userName}</h3><p><strong>Aadhaar:</strong> ${k.aadhaar_number||'-'}</p><p><strong>PAN:</strong> ${k.pan_number||'-'}</p>
-            <div class="kyc-images-grid">
-                ${aadFrontUrl?`<div class="kyc-image"><img src="${aadFrontUrl}"><br>Aadhaar Front</div>`:'<div class="kyc-image">❌ Aadhaar Front missing</div>'}
-                ${aadBackUrl?`<div class="kyc-image"><img src="${aadBackUrl}"><br>Aadhaar Back</div>`:'<div class="kyc-image">❌ Aadhaar Back missing</div>'}
-                ${aadFrontSelfieUrl?`<div class="kyc-image"><img src="${aadFrontSelfieUrl}"><br>Aadhaar Front Selfie</div>`:'<div class="kyc-image">❌ Aadhaar Front Selfie missing</div>'}
-                ${aadBackSelfieUrl?`<div class="kyc-image"><img src="${aadBackSelfieUrl}"><br>Aadhaar Back Selfie</div>`:'<div class="kyc-image">❌ Aadhaar Back Selfie missing</div>'}
-                ${panFrontDocUrl?`<div class="kyc-image"><img src="${panFrontDocUrl}"><br>PAN Front</div>`:'<div class="kyc-image">❌ PAN Front missing</div>'}
-                ${panBackDocUrl?`<div class="kyc-image"><img src="${panBackDocUrl}"><br>PAN Back</div>`:'<div class="kyc-image">❌ PAN Back missing</div>'}
-                ${panFrontSelfieUrl?`<div class="kyc-image"><img src="${panFrontSelfieUrl}"><br>PAN Front Selfie</div>`:'<div class="kyc-image">❌ PAN Front Selfie missing</div>'}
-                ${panBackSelfieUrl?`<div class="kyc-image"><img src="${panBackSelfieUrl}"><br>PAN Back Selfie</div>`:'<div class="kyc-image">❌ PAN Back Selfie missing</div>'}
-                ${hdPicUrl?`<div class="kyc-image"><img src="${hdPicUrl}"><br>HD Pic</div>`:'<div class="kyc-image">❌ HD Pic missing</div>'}
-            </div>
-            <div class="flex-btns"><button class="btn-sm btn-approve verifyKyc" data-id="${k.id}" data-uid="${k.uid}">Approve KYC</button><button class="btn-sm btn-reject rejectKyc" data-id="${k.id}">Reject KYC</button></div></div>`;
+            const selfieUrl = await getSignedUrl(k.selfie_image);
+            html += `<div class="kyc-review-card">
+                <h3>${userName}</h3>
+                <p><strong>Full Name:</strong> ${escapeHtml(k.full_name || '-')}</p>
+                <p><strong>Date of Birth:</strong> ${escapeHtml(k.date_of_birth || '-')}</p>
+                <p><strong>Mobile Number:</strong> ${escapeHtml(k.mobile_number || '-')}</p>
+                <p><strong>Aadhaar Number:</strong> ${escapeHtml(k.aadhaar_number || '-')}</p>
+                <div class="kyc-image">${selfieUrl?`<img src="${selfieUrl}" onerror="this.src='https://placehold.co/150x100?text=No+Image'"><br>Selfie holding Aadhaar`:'❌ Selfie missing'}</div>
+                <div class="flex-btns"><button class="btn-sm btn-approve verifyKyc" data-id="${k.id}" data-uid="${k.uid}">Approve KYC</button><button class="btn-sm btn-reject rejectKyc" data-id="${k.id}">Reject KYC</button></div>
+            </div>`;
         }
         return html;
     }
 
-    // ==================== USER MANAGEMENT ====================
+    // ==================== USERS ====================
     async function renderUsers(){
         const { data: users } = await supabase.from('profiles').select('*');
         return `<h2 class="section-title">User Management</h2>
-        <table><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+        <tr><thead><tr><th>Name/Email</th><th>Balance</th><th>KYC</th><th>Fraud Score</th><th>Status</th><th>Actions</th></tr></thead><tbody>
         ${users?.map(u => `<tr>
             <td>${u.name||u.email}<br><small>${u.id}</small></td>
             <td>₹${u.balance||0}</td>
@@ -321,11 +306,11 @@
                 <button class="btn-sm sendNotif" data-id="${u.id}" data-name="${u.name||u.email}">Send Notification</button>
                 <button class="btn-sm btn-reject deleteUser" data-id="${u.id}">Delete</button>
             </td>
-        </tr>`).join('')}
-        </tbody></td>`;
+        </td>`).join('')}
+        </tbody></table>`;
     }
 
-    // ==================== WITHDRAWALS (deducted already, refund on reject) ====================
+    // ==================== WITHDRAWALS ====================
     async function renderWithdrawals(){
         const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Withdrawals</h2>
@@ -341,7 +326,7 @@
         </tbody></table>`;
     }
 
-    // ==================== TRANSACTIONS (ALL USERS) ====================
+    // ==================== TRANSACTIONS ====================
     async function renderTransactions(){
         const { data: allHistory } = await supabase.from('balance_history').select('*, profiles(name, email)').order('created_at', { ascending: false }).limit(200);
         const { data: allWithdrawals } = await supabase.from('withdrawals').select('*, profiles(name, email)').order('created_at', { ascending: false }).limit(200);
@@ -487,6 +472,7 @@
             if(msg) await supabase.from('support_messages').insert({ uid: btn.dataset.uid, recipient_uid: btn.dataset.uid, message: `[Admin Request] ${msg}`, is_admin: true });
             loadTab(activeTab);
         }));
+        // KYC approval with bonus
         document.querySelectorAll('.verifyKyc').forEach(btn => btn.addEventListener('click', async () => {
             const kycId = btn.dataset.id;
             const userId = btn.dataset.uid;
@@ -501,25 +487,12 @@
                     const { data: referrer } = await supabase.from('profiles').select('balance, referral_count, referral_kyc_bonus_paid, referral_earnings').eq('id', user.referred_by).single();
                     if (!referrer.referral_kyc_bonus_paid && (referrer.referral_count || 0) < 100) {
                         const newRefBal = (referrer.balance || 0) + 50;
-                        await supabase.from('profiles').update({
-                            balance: newRefBal,
-                            referral_count: (referrer.referral_count || 0) + 1,
-                            referral_kyc_bonus_paid: true,
-                            referral_earnings: (referrer.referral_earnings || 0) + 50
-                        }).eq('id', user.referred_by);
-                        await supabase.from('balance_history').insert({
-                            uid: user.referred_by,
-                            amount_change: 50,
-                            new_balance: newRefBal,
-                            reason: `Referral bonus for user ${userId} completing KYC`,
-                            created_by: currentAdmin.id
-                        });
+                        await supabase.from('profiles').update({ balance: newRefBal, referral_count: (referrer.referral_count || 0) + 1, referral_kyc_bonus_paid: true, referral_earnings: (referrer.referral_earnings || 0) + 50 }).eq('id', user.referred_by);
+                        await supabase.from('balance_history').insert({ uid: user.referred_by, amount_change: 50, new_balance: newRefBal, reason: `Referral bonus for user ${userId} completing KYC`, created_by: currentAdmin.id });
                     }
                 }
                 await supabase.from('notifications').insert({ uid: userId, title: 'KYC Approved', message: 'Your KYC has been approved! You received ₹100 bonus.' });
-                if (user.referred_by) {
-                    await supabase.from('notifications').insert({ uid: user.referred_by, title: 'Referral Bonus', message: `Your referred user completed KYC! You earned ₹50.` });
-                }
+                if (user.referred_by) { await supabase.from('notifications').insert({ uid: user.referred_by, title: 'Referral Bonus', message: `Your referred user completed KYC! You earned ₹50.` }); }
             }
             loadTab(activeTab);
         }));
@@ -586,9 +559,7 @@
             });
         }
         const userSelect = document.getElementById('chatUserSelect');
-        if(userSelect){
-            userSelect.addEventListener('change', (e) => { localStorage.setItem('selectedChatUserId', e.target.value); loadTab('chat'); });
-        }
+        if(userSelect){ userSelect.addEventListener('change', (e) => { localStorage.setItem('selectedChatUserId', e.target.value); loadTab('chat'); }); }
     }
 
     document.querySelectorAll('.nav-item[data-tab]').forEach(el => el.addEventListener('click', () => loadTab(el.dataset.tab)));
