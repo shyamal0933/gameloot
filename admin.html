@@ -9,7 +9,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* (same styles as previous admin.html – keep unchanged) */
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
         body{background:#0a0c12;color:#eef2ff;}
         .admin-container{display:flex;min-height:100vh;}
@@ -45,6 +44,7 @@
         .fraud-warning { background:#7f1a1a; border-radius:16px; padding:0.5rem; margin-top:0.5rem; color:#ffaaaa; }
         .field-builder { background:#0f1222; padding:1rem; border-radius:16px; margin-top:1rem; }
         .field-item { background:#1a1e2e; padding:0.8rem; margin:0.5rem 0; border-radius:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+        .transaction-row { margin-bottom:0.8rem; padding:0.8rem; background:#0f1222; border-radius:16px; border-left:3px solid #00f2fe; }
     </style>
 </head>
 <body>
@@ -57,6 +57,7 @@
         <div class="nav-item" data-tab="kyc"><i class="fas fa-id-card"></i><span>KYC Reviews</span></div>
         <div class="nav-item" data-tab="users"><i class="fas fa-users"></i><span>Users</span></div>
         <div class="nav-item" data-tab="withdrawals"><i class="fas fa-money-bill-wave"></i><span>Withdrawals</span></div>
+        <div class="nav-item" data-tab="transactions"><i class="fas fa-exchange-alt"></i><span>Transactions</span></div>
         <div class="nav-item" data-tab="leaderboard"><i class="fas fa-trophy"></i><span>Leaderboard</span></div>
         <div class="nav-item" data-tab="fraud"><i class="fas fa-shield-alt"></i><span>Fraud Detection</span></div>
         <div class="nav-item" data-tab="chat"><i class="fas fa-comment-dots"></i><span>Support Chat</span></div>
@@ -229,8 +230,8 @@
             <td>${t.deadline ? new Date(t.deadline).toLocaleString() : '-'}</td>
             <td>${t.custom_fields?.length || 0}</td>
             <td class="flex-btns"><button class="btn-sm editTask" data-task='${JSON.stringify(t)}'>Edit</button><button class="btn-sm btn-reject deleteTask" data-id="${t.id}">Delete</button></td>
-        </tr>`).join('') || '<tr><td colspan="5">No tasks</td></tr>'}
-        </tbody></tr>
+        </tr>`).join('') || '<tr><td colspan="5">No tasks</td></table>'}
+        </tbody></table>
         </div>`;
     }
 
@@ -269,7 +270,7 @@
         return html;
     }
 
-    // ==================== KYC with ₹50 bonus ====================
+    // ==================== KYC ====================
     async function renderKyc(){
         const { data: kycList } = await supabase.from('verifications').select('*').eq('status', 'pending');
         if(!kycList?.length) return `<h2 class="section-title">KYC Reviews</h2><p>No pending KYC requests.</p>`;
@@ -303,7 +304,7 @@
         return html;
     }
 
-    // ==================== USER MANAGEMENT (with balance adjustment) ====================
+    // ==================== USER MANAGEMENT ====================
     async function renderUsers(){
         const { data: users } = await supabase.from('profiles').select('*');
         return `<h2 class="section-title">User Management</h2>
@@ -328,16 +329,62 @@
     async function renderWithdrawals(){
         const { data: wd } = await supabase.from('withdrawals').select('*, profiles(name)').eq('status', 'pending');
         return `<h2 class="section-title">Withdrawals</h2>
-        <table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
+        </table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Details</th><th>Action</th></tr></thead><tbody>
         ${wd?.map(w => `<tr>
             <td>${w.profiles?.name}</td>
             <td>₹${w.amount}</td>
             <td>${w.method}</td>
             <td>${w.details}</td>
             <td class="flex-btns"><button class="btn-sm btn-approve approveWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Approve</button>
-            <button class="btn-sm btn-reject rejectWd" data-id="${w.id}">Reject</button></td>
+            <button class="btn-sm btn-reject rejectWd" data-id="${w.id}" data-uid="${w.uid}" data-amount="${w.amount}">Reject</button></td>
         </tr>`).join('') || '<tr><td colspan="5">No pending withdrawals</td></tr>'}
-        </tbody><tr>`;
+        </tbody></tr>`;
+    }
+
+    // ==================== TRANSACTIONS (ADMIN VIEW ALL USERS) ====================
+    async function renderTransactions(){
+        // Fetch all balance_history with user profile
+        const { data: allHistory } = await supabase
+            .from('balance_history')
+            .select('*, profiles(name, email)')
+            .order('created_at', { ascending: false })
+            .limit(200);
+        // Fetch all withdrawals with user profile
+        const { data: allWithdrawals } = await supabase
+            .from('withdrawals')
+            .select('*, profiles(name, email)')
+            .order('created_at', { ascending: false })
+            .limit(200);
+        
+        let html = `<h2 class="section-title">📊 All User Transactions</h2>`;
+        
+        html += `<h3>💰 Balance Changes (All Users)</h3><div>`;
+        for(const entry of allHistory || []){
+            const sign = entry.amount_change >= 0 ? '+' : '';
+            const color = entry.amount_change >= 0 ? '#10b981' : '#ef4444';
+            html += `<div class="transaction-row">
+                <strong>${escapeHtml(entry.profiles?.name || entry.profiles?.email || 'Unknown')}</strong><br>
+                <span style="color:${color};">${sign}₹${entry.amount_change}</span> – New balance: ₹${entry.new_balance}<br>
+                Reason: ${escapeHtml(entry.reason)}<br>
+                <small>${new Date(entry.created_at).toLocaleString()}</small>
+            </div>`;
+        }
+        if(!allHistory?.length) html += `<p>No balance changes recorded.</p>`;
+        html += `</div><h3>🏧 Withdrawal Requests (All Users)</h3><div>`;
+        for(const w of allWithdrawals || []){
+            const statusColor = w.status === 'approved' ? '#10b981' : (w.status === 'pending' ? '#f59e0b' : '#ef4444');
+            html += `<div class="transaction-row">
+                <strong>${escapeHtml(w.profiles?.name || w.profiles?.email || 'Unknown')}</strong><br>
+                Amount: ₹${w.amount}<br>
+                Method: ${w.method}<br>
+                Details: ${escapeHtml(w.details)}<br>
+                Status: <span style="color:${statusColor};">${w.status.toUpperCase()}</span><br>
+                <small>${new Date(w.created_at).toLocaleString()}</small>
+            </div>`;
+        }
+        if(!allWithdrawals?.length) html += `<p>No withdrawal requests yet.</p>`;
+        html += `</div>`;
+        return html;
     }
 
     // ==================== LEADERBOARD ====================
@@ -399,6 +446,7 @@
         else if(tab === 'kyc') mainDiv.innerHTML = await renderKyc();
         else if(tab === 'users') mainDiv.innerHTML = await renderUsers();
         else if(tab === 'withdrawals') mainDiv.innerHTML = await renderWithdrawals();
+        else if(tab === 'transactions') mainDiv.innerHTML = await renderTransactions();
         else if(tab === 'leaderboard') mainDiv.innerHTML = await renderLeaderboard();
         else if(tab === 'fraud') mainDiv.innerHTML = await renderFraud();
         else if(tab === 'chat') mainDiv.innerHTML = await renderChat();
@@ -412,8 +460,6 @@
         await supabase.from('profiles').update({ balance: newBalance }).eq('id', userId);
         await supabase.from('balance_history').insert({ uid: userId, amount_change: reward, new_balance: newBalance, reason: `Task approval (submission ${submissionId})`, created_by: currentAdmin.id });
         await supabase.from('profiles').update({ total_earnings: supabase.sql`total_earnings + ${reward}` }).eq('id', userId);
-        
-        // 10% commission for referrer
         if (user.referred_by) {
             const commission = Math.floor(reward * 0.1);
             if (commission > 0) {
@@ -453,22 +499,17 @@
             if(msg) await supabase.from('support_messages').insert({ uid: btn.dataset.uid, recipient_uid: btn.dataset.uid, message: `[Admin Request] ${msg}`, is_admin: true });
             loadTab(activeTab);
         }));
-        
-        // ========== KYC APPROVAL with ₹50 bonus to user and referrer ==========
         document.querySelectorAll('.verifyKyc').forEach(btn => btn.addEventListener('click', async () => {
             const kycId = btn.dataset.id;
             const userId = btn.dataset.uid;
             await supabase.from('verifications').update({ status: 'verified' }).eq('id', kycId);
             await supabase.from('profiles').update({ verification_status: 'verified' }).eq('id', userId);
             
-            // ₹50 bonus for the user themselves
             const { data: user } = await supabase.from('profiles').select('balance, kyc_bonus_received, referred_by').eq('id', userId).single();
             if (!user.kyc_bonus_received) {
-                const newBalance = (user.balance || 0) + 50;
+                const newBalance = (user.balance || 0) + 100;
                 await supabase.from('profiles').update({ balance: newBalance, kyc_bonus_received: true }).eq('id', userId);
-                await supabase.from('balance_history').insert({ uid: userId, amount_change: 50, new_balance: newBalance, reason: 'KYC completion bonus', created_by: currentAdmin.id });
-                
-                // ₹50 bonus for referrer (if exists and not already paid for this referred user)
+                await supabase.from('balance_history').insert({ uid: userId, amount_change: 100, new_balance: newBalance, reason: 'KYC completion bonus', created_by: currentAdmin.id });
                 if (user.referred_by) {
                     const { data: referrer } = await supabase.from('profiles').select('balance, referral_count, referral_kyc_bonus_paid, referral_earnings').eq('id', user.referred_by).single();
                     if (!referrer.referral_kyc_bonus_paid && (referrer.referral_count || 0) < 100) {
@@ -479,20 +520,23 @@
                             referral_kyc_bonus_paid: true,
                             referral_earnings: (referrer.referral_earnings || 0) + 50
                         }).eq('id', user.referred_by);
-                        await supabase.from('balance_history').insert({ uid: user.referred_by, amount_change: 50, new_balance: newRefBal, reason: `Referral bonus for user ${userId} completing KYC`, created_by: currentAdmin.id });
+                        await supabase.from('balance_history').insert({
+                            uid: user.referred_by,
+                            amount_change: 50,
+                            new_balance: newRefBal,
+                            reason: `Referral bonus for user ${userId} completing KYC`,
+                            created_by: currentAdmin.id
+                        });
                     }
                 }
-                await supabase.from('notifications').insert({ uid: userId, title: 'KYC Approved', message: 'Your KYC has been approved! You received ₹50 bonus.' });
+                await supabase.from('notifications').insert({ uid: userId, title: 'KYC Approved', message: 'Your KYC has been approved! You received ₹100 bonus.' });
                 if (user.referred_by) {
                     await supabase.from('notifications').insert({ uid: user.referred_by, title: 'Referral Bonus', message: `Your referred user completed KYC! You earned ₹50.` });
                 }
             }
             loadTab(activeTab);
         }));
-        
         document.querySelectorAll('.rejectKyc').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('verifications').update({ status: 'rejected' }).eq('id', btn.dataset.id); loadTab(activeTab); }));
-        
-        // ========== USER MANAGEMENT ACTIONS ==========
         document.querySelectorAll('.adjustBalance').forEach(btn => btn.addEventListener('click', async () => {
             const userId = btn.dataset.id;
             const userName = btn.dataset.name;
@@ -525,12 +569,29 @@
                 }
             }
         }));
-        
         document.querySelectorAll('.suspendUser').forEach(btn => btn.addEventListener('click', async () => { const newStatus = btn.dataset.status === 'suspended' ? 'active' : 'suspended'; await supabase.from('profiles').update({ account_status: newStatus }).eq('id', btn.dataset.id); loadTab(activeTab); }));
         document.querySelectorAll('.deleteUser').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('profiles').delete().eq('id', btn.dataset.id); loadTab(activeTab); }));
-        document.querySelectorAll('.approveWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', btn.dataset.id); await supabase.from('notifications').insert({ uid: btn.dataset.uid, title: 'Withdrawal Approved', message: `Your withdrawal of ₹${btn.dataset.amount} has been approved.` }); loadTab(activeTab); }));
-        document.querySelectorAll('.rejectWd').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('withdrawals').update({ status: 'rejected' }).eq('id', btn.dataset.id); loadTab(activeTab); }));
-        document.querySelectorAll('.sendNotif').forEach(btn => btn.addEventListener('click', async () => { const { value: notif } = await Swal.fire({ title: 'Send Notification', html: '<input id="notifTitle" placeholder="Title"><textarea id="notifMsg" placeholder="Message"></textarea>', preConfirm: () => ({ title: document.getElementById('notifTitle').value, msg: document.getElementById('notifMsg').value }) }); if(notif) await supabase.from('notifications').insert({ uid: btn.dataset.id, title: notif.title, message: notif.msg, created_at: new Date() }); loadTab(activeTab); }));
+        document.querySelectorAll('.approveWd').forEach(btn => btn.addEventListener('click', async () => {
+            await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', btn.dataset.id);
+            await supabase.from('notifications').insert({ uid: btn.dataset.uid, title: 'Withdrawal Approved', message: `Your withdrawal of ₹${btn.dataset.amount} has been approved.` });
+            loadTab(activeTab);
+        }));
+        document.querySelectorAll('.rejectWd').forEach(btn => btn.addEventListener('click', async () => {
+            const withdrawalId = btn.dataset.id;
+            const userId = btn.dataset.uid;
+            const amount = parseInt(btn.dataset.amount);
+            const { data: user } = await supabase.from('profiles').select('balance').eq('id', userId).single();
+            const newBalance = (user.balance || 0) + amount;
+            await supabase.from('profiles').update({ balance: newBalance }).eq('id', userId);
+            await supabase.from('balance_history').insert({ uid: userId, amount_change: amount, new_balance: newBalance, reason: `Withdrawal rejected – amount refunded`, created_by: currentAdmin.id });
+            await supabase.from('withdrawals').update({ status: 'rejected' }).eq('id', withdrawalId);
+            loadTab(activeTab);
+        }));
+        document.querySelectorAll('.sendNotif').forEach(btn => btn.addEventListener('click', async () => {
+            const { value: notif } = await Swal.fire({ title: 'Send Notification', html: '<input id="notifTitle" placeholder="Title"><textarea id="notifMsg" placeholder="Message"></textarea>', preConfirm: () => ({ title: document.getElementById('notifTitle').value, msg: document.getElementById('notifMsg').value }) });
+            if(notif) await supabase.from('notifications').insert({ uid: btn.dataset.id, title: notif.title, message: notif.msg, created_at: new Date() });
+            loadTab(activeTab);
+        }));
         document.querySelectorAll('.increaseFraud').forEach(btn => btn.addEventListener('click', async () => { const { data: p } = await supabase.from('profiles').select('fraud_score').eq('id', btn.dataset.id).single(); await supabase.from('profiles').update({ fraud_score: (p.fraud_score || 0) + 10 }).eq('id', btn.dataset.id); loadTab(activeTab); }));
         document.querySelectorAll('.resetFraud').forEach(btn => btn.addEventListener('click', async () => { await supabase.from('profiles').update({ fraud_score: 0 }).eq('id', btn.dataset.id); loadTab(activeTab); }));
         const sendBtn = document.getElementById('sendAdminReply');
