@@ -9,7 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* (same modern styles – keep all button and layout styles from previous version) */
+        /* (all styles remain exactly as in previous final – kept unchanged) */
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
         body{background:#0b0e17;color:#eef5ff;overflow-x:hidden;}
         .top-bar{display:flex;justify-content:space-between;align-items:center;padding:0.8rem 1.5rem;background:rgba(10,14,23,0.95);backdrop-filter:blur(12px);border-bottom:1px solid rgba(0,242,254,0.3);position:sticky;top:0;z-index:100;}
@@ -293,7 +293,7 @@
             </div><div class="referral-box"><span><i class="fas fa-link"></i> Your Code: <strong>${userProfile.referral_code}</strong></span><button id="copyCodeBtn" class="btn-sm">Copy Code</button><button id="copyLinkBtn" class="btn-sm">Copy Link</button></div>`;
         }
 
-        // ==================== TASKS (unchanged – full clickable cards) ====================
+        // ==================== TASKS (unchanged) ====================
         async function getSignedUrl(path, bucket='task_submissions') { if(!path) return null; const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path,3600); if(error) return null; return data.signedUrl; }
         async function renderTasks() {
             const { data: tasks } = await supabase.from('tasks').select('*');
@@ -371,20 +371,18 @@
             }
         }
 
-        // ==================== MY SUBMISSIONS (unchanged) ====================
-        async function renderMySubmissions() { /* same as final */ return `<div>Submissions</div>`; }
+        // ==================== MY SUBMISSIONS ====================
+        async function renderMySubmissions() { /* same as final – placeholder */ return `<div>Submissions</div>`; }
         async function viewSubmissionDetails(submission, task) { /* same */ }
 
-        // ==================== REFERRALS (unchanged) ====================
-        async function renderReferrals() { /* same as final */ return `<div>Referrals</div>`; }
+        // ==================== REFERRALS ====================
+        async function renderReferrals() { /* same as final – placeholder */ return `<div>Referrals</div>`; }
 
         // ==================== KYC WITH PERSONAL INFORMATION STEP ====================
         async function renderKyc() {
             const { data: existing } = await supabase.from('verifications').select('*').eq('uid', currentUser.id).order('submitted_at', { ascending: false }).limit(1).maybeSingle();
             if (existing?.status === 'verified') return `<h2>KYC Status</h2><div class="stat-card">✅ Verified! You can withdraw.</div>`;
             if (existing?.status === 'pending') return `<h2>KYC Status</h2><div class="stat-card">⏳ Under review.</div>`;
-            
-            // If no submission yet, show personal info form first
             if (!existing || existing.status === 'rejected') {
                 return `<h2>📋 Complete KYC (Step 1/2)</h2>
                 <div class="kyc-card">
@@ -394,8 +392,6 @@
                     <button type="button" id="savePersonalInfoBtn" class="btn-primary">Save & Continue →</button>
                 </div>`;
             }
-            
-            // If personal info already saved but not yet submitted the KYC docs, show the document upload step
             return `<h2>📄 Complete KYC (Step 2/2)</h2>
             <div class="kyc-card">
                 <div class="file-group"><label>Aadhaar Number (required)</label><input type="text" id="aadhaarNum" placeholder="12-digit Aadhaar number" required></div>
@@ -403,7 +399,6 @@
                 <button type="button" id="submitKycBtn" class="btn-primary">Submit KYC</button>
             </div>`;
         }
-
         async function savePersonalInfo() {
             const fullName = document.getElementById('fullName')?.value.trim();
             const dob = document.getElementById('dob')?.value.trim();
@@ -411,37 +406,23 @@
             if (!fullName || !dob || !mobile) return toast("All fields are required", "error");
             if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dob)) return toast("Date of birth must be in DD/MM/YYYY format", "error");
             if (!/^\d{10}$/.test(mobile)) return toast("Mobile number must be 10 digits", "error");
-            
-            // Check if a pending record exists; if yes, update it; else insert new
             const { data: existing } = await supabase.from('verifications').select('id').eq('uid', currentUser.id).maybeSingle();
             if (existing) {
-                const { error } = await supabase.from('verifications').update({
-                    full_name: fullName,
-                    date_of_birth: dob,
-                    mobile_number: mobile
-                }).eq('uid', currentUser.id);
+                const { error } = await supabase.from('verifications').update({ full_name: fullName, date_of_birth: dob, mobile_number: mobile }).eq('uid', currentUser.id);
                 if (error) toast(error.message, "error");
                 else toast("Personal information saved! Now upload your KYC documents.", "success");
             } else {
-                const { error } = await supabase.from('verifications').insert({
-                    uid: currentUser.id,
-                    full_name: fullName,
-                    date_of_birth: dob,
-                    mobile_number: mobile,
-                    status: 'pending'
-                });
+                const { error } = await supabase.from('verifications').insert({ uid: currentUser.id, full_name: fullName, date_of_birth: dob, mobile_number: mobile, status: 'pending' });
                 if (error) toast(error.message, "error");
                 else toast("Personal information saved! Now upload your KYC documents.", "success");
             }
             renderPanel('kyc');
         }
-
         async function submitKyc() {
             const aadhaarNum = document.getElementById('aadhaarNum')?.value.trim();
             const selfieFile = document.getElementById('selfieImage')?.files[0];
             if (!aadhaarNum || aadhaarNum.length < 10) return toast("Valid Aadhaar number required", "error");
             if (!selfieFile) return toast("Selfie holding Aadhaar card is required", "error");
-            
             toast("Uploading...", "info");
             try {
                 const upload = async (file, name) => {
@@ -451,19 +432,14 @@
                     return path;
                 };
                 const selfiePath = await upload(selfieFile, 'selfie');
-                const { error } = await supabase.from('verifications').update({
-                    aadhaar_number: aadhaarNum,
-                    selfie_image: selfiePath,
-                    status: 'pending',
-                    submitted_at: new Date()
-                }).eq('uid', currentUser.id);
+                const { error } = await supabase.from('verifications').update({ aadhaar_number: aadhaarNum, selfie_image: selfiePath, status: 'pending', submitted_at: new Date() }).eq('uid', currentUser.id);
                 if (error) throw error;
                 toast("KYC submitted! Pending review.", "success");
                 renderPanel('kyc');
             } catch (e) { toast("Submission failed: "+e.message, "error"); }
         }
 
-        // ==================== WITHDRAWAL (min 200) ====================
+        // ==================== WITHDRAWAL (min 200) WITH WORKING ADD PAYMENT METHOD ====================
         async function renderWithdraw() {
             const { data: methods } = await supabase.from('payment_methods').select('*').eq('uid',currentUser.id);
             return `<h2>💸 Withdraw Funds</h2><div class="stats-grid"><div class="stat-card"><h4>Balance</h4><div class="value">₹${userProfile.balance||0}</div></div><div class="stat-card"><h4>Min Withdrawal</h4><div class="value">₹200</div></div></div>
@@ -471,8 +447,90 @@
             <button id="addMethodBtn" class="btn-sm">+ Add Bank/UPI</button>
             <h3>Request Withdrawal</h3><form id="wdForm"><select id="wdMethod">${methods?.map(m=>`<option value="${m.id}">${m.type} - ${m.details}</option>`).join('')}</select><input type="number" id="wdAmount" placeholder="Amount (Min ₹200)" required><button type="submit" class="btn-primary">Withdraw</button></form>`;
         }
-        async function addPaymentMethod() { /* same as final */ toast("Method added","success"); renderPanel('withdraw'); }
-        async function deletePaymentMethod(id) { await supabase.from('payment_methods').delete().eq('id',id); renderPanel('withdraw'); }
+
+        // ========== FIXED ADD PAYMENT METHOD ==========
+        async function addPaymentMethod() {
+            const { value: methodType } = await Swal.fire({
+                title: 'Add Payment Method',
+                input: 'select',
+                inputOptions: {
+                    'UPI': 'UPI (UPI ID)',
+                    'bank': 'Bank Account (Name, Account Number, IFSC)'
+                },
+                inputPlaceholder: 'Select type',
+                showCancelButton: true,
+                confirmButtonText: 'Next'
+            });
+            if (!methodType) return;
+
+            if (methodType === 'UPI') {
+                const { value: upiId } = await Swal.fire({
+                    title: 'Enter UPI ID',
+                    input: 'text',
+                    inputPlaceholder: 'e.g., username@okhdfcbank',
+                    showCancelButton: true,
+                    confirmButtonText: 'Save'
+                });
+                if (upiId) {
+                    const { error } = await supabase.from('payment_methods').insert({
+                        uid: currentUser.id,
+                        type: 'UPI',
+                        details: upiId,
+                        created_at: new Date()
+                    });
+                    if (error) toast(error.message, "error");
+                    else { toast("UPI ID saved successfully", "success"); renderPanel('withdraw'); }
+                }
+            } else if (methodType === 'bank') {
+                const { value: form } = await Swal.fire({
+                    title: 'Bank Account Details',
+                    html: `<input id="bankName" class="swal2-input" placeholder="Full Name (as in account)">
+                           <input id="bankAccount" class="swal2-input" placeholder="Account Number">
+                           <input id="bankIfsc" class="swal2-input" placeholder="IFSC Code">`,
+                    focusConfirm: false,
+                    showCancelButton: true,
+                    confirmButtonText: 'Save',
+                    preConfirm: () => {
+                        const name = document.getElementById('bankName').value.trim();
+                        const account = document.getElementById('bankAccount').value.trim();
+                        const ifsc = document.getElementById('bankIfsc').value.trim();
+                        if (!name || !account || !ifsc) {
+                            Swal.showValidationMessage('All fields are required');
+                            return false;
+                        }
+                        return { name, account, ifsc };
+                    }
+                });
+                if (form) {
+                    const details = JSON.stringify(form);
+                    const { error } = await supabase.from('payment_methods').insert({
+                        uid: currentUser.id,
+                        type: 'bank',
+                        details: details,
+                        created_at: new Date()
+                    });
+                    if (error) toast(error.message, "error");
+                    else { toast("Bank account saved successfully", "success"); renderPanel('withdraw'); }
+                }
+            }
+        }
+
+        async function deletePaymentMethod(id) {
+            const confirm = await Swal.fire({
+                title: 'Delete?',
+                text: 'Remove this payment method?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Yes, delete'
+            });
+            if (confirm.isConfirmed) {
+                const { error } = await supabase.from('payment_methods').delete().eq('id', id);
+                if (error) toast(error.message, "error");
+                else { toast("Deleted", "success"); renderPanel('withdraw'); }
+            }
+        }
+
         async function requestWithdrawal(amount, methodId) {
             if(userProfile.verification_status !== 'verified') return toast("Complete KYC first","error");
             if(amount < 200) return toast("Minimum withdrawal is ₹200","error");
@@ -489,8 +547,8 @@
         }
 
         // ==================== TRANSACTIONS ====================
-        async function renderTransactions() { /* same as final */ return `<div>Transactions</div>`; }
-        async function renderChat() { /* same as final */ return `<div>Chat</div>`; }
+        async function renderTransactions() { /* same as final – placeholder */ return `<div>Transactions</div>`; }
+        async function renderChat() { /* same as final – placeholder */ return `<div>Chat</div>`; }
 
         let currentTab = 'dashboard';
         async function renderPanel(tab) {
