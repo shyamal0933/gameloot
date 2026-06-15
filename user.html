@@ -9,16 +9,18 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* (same styles as previous user.html – keep your engaging button styles) */
+        /* (all styles same as previous final user.html – keep unchanged) */
         *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;}
         body{background:#0b0e17;color:#eef5ff;overflow-x:hidden;}
         .top-bar{display:flex;justify-content:space-between;align-items:center;padding:1rem 2rem;background:rgba(10,14,23,0.8);backdrop-filter:blur(10px);border-bottom:1px solid rgba(0,242,254,0.2);position:sticky;top:0;z-index:100;}
         .logo{font-size:1.6rem;font-weight:800;background:linear-gradient(135deg,#00f2fe,#4facfe);-webkit-background-clip:text;background-clip:text;color:transparent;}
-        .auth-buttons{display:flex;gap:12px;align-items:center;}
-        .btn-outline{background:transparent;border:1px solid #00f2fe;padding:8px 20px;border-radius:40px;color:#00f2fe;font-weight:600;cursor:pointer;transition:0.2s;}
-        .btn-primary{background:linear-gradient(95deg,#0055ff,#00c3ff);border:none;padding:8px 20px;border-radius:40px;color:white;font-weight:600;cursor:pointer;}
-        .notif-bell{position:relative;cursor:pointer;font-size:1.4rem;color:#a0abcf;margin-left:15px;}
+        .right-actions{display:flex;gap:15px;align-items:center;}
+        .notif-bell{position:relative;cursor:pointer;font-size:1.4rem;color:#a0abcf;transition:0.2s;}
+        .notif-bell:hover{color:#00f2fe;transform:scale(1.05);}
         .notif-badge{position:absolute;top:-8px;right:-8px;background:#ef4444;color:white;border-radius:50%;padding:2px 6px;font-size:0.7rem;}
+        .logout-btn{background:linear-gradient(95deg,#dc2626,#b91c1c);border:none;padding:8px 20px;border-radius:40px;color:white;font-weight:600;cursor:pointer;transition:0.2s;}
+        .logout-btn:hover{transform:translateY(-2px);background:linear-gradient(95deg,#b91c1c,#991b1b);}
+        @media (max-width:768px){.logout-btn{padding:6px 14px;font-size:0.8rem;}}
         .hero{min-height:calc(100vh - 80px);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:2rem;}
         .hero h1{font-size:3rem;font-weight:800;background:linear-gradient(135deg,#fff,#00f2fe);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:1rem;}
         .hero p{font-size:1.2rem;color:#a0abcf;max-width:600px;margin-bottom:2rem;}
@@ -48,7 +50,7 @@
         .task-card p{color:#a0abcf;margin-bottom:1rem;line-height:1.4;}
         .reward-badge{background:rgba(0,242,254,0.15);color:#00f2fe;padding:4px 12px;border-radius:40px;display:inline-block;margin:8px 0;font-weight:600;}
         .task-footer{display:flex;justify-content:space-between;align-items:center;margin-top:1rem;font-size:0.8rem;color:#8e9acf;}
-        .submission-card{background:#111827;border-radius:24px;padding:1.2rem;margin-bottom:1rem;border:1px solid #2a3448;transition:0.2s;}
+        .submission-card{background:#111827;border-radius:24px;padding:1.2rem;margin-bottom:1rem;border:1px solid #2a3448;}
         .submission-card:hover{border-color:#00f2fe;}
         .status-badge{display:inline-block;padding:4px 12px;border-radius:40px;font-size:0.7rem;font-weight:bold;}
         .status-approved{background:#10b98120;color:#10b981;}
@@ -277,20 +279,20 @@
             Swal.fire({ title:`Submission: ${task.title}`, html:`<div style="text-align:left;"><p><strong>Status:</strong> ${submission.status.toUpperCase()}</p><p><strong>Reward:</strong> ₹${submission.reward}</p><p><strong>Submitted:</strong> ${new Date(submission.created_at).toLocaleString()}</p><hr><h4>Your answers:</h4>${fieldsHtml}${feedbackNote}</div>`, confirmButtonText:'Close' });
         }
 
-        // ==================== REFERRALS (with full list and per-user commission) ====================
+        // ==================== REFERRALS (with active count and correct explanation) ====================
         async function renderReferrals() {
             const link = `${location.origin}${location.pathname}?ref=${userProfile.referral_code}`;
             const { data: referredUsers } = await supabase.from('profiles').select('id, email, name, verification_status, kyc_bonus_received').eq('referred_by', userProfile.referral_code);
             const { data: commissions } = await supabase.from('referral_commissions').select('commission_amount, referred_uid').eq('referrer_uid', currentUser.id);
             const totalCommission = commissions?.reduce((sum, c) => sum + c.commission_amount, 0) || 0;
-            const successfulReferrals = referredUsers?.filter(u => u.kyc_bonus_received === true).length || 0;
+            const activeReferrals = referredUsers?.filter(u => u.kyc_bonus_received === true).length || 0;
             const pendingReferrals = referredUsers?.filter(u => u.kyc_bonus_received !== true).length || 0;
             let referredListHtml = '';
             for (const ref of referredUsers || []) {
                 const commissionFromRef = commissions?.filter(c => c.referred_uid === ref.id).reduce((sum, c) => sum + c.commission_amount, 0) || 0;
                 referredListHtml += `
                     <div class="payment-method-card">
-                        <div><strong>${escapeHtml(ref.name || ref.email)}</strong><br>KYC: ${ref.verification_status}<br>Bonus paid: ${ref.kyc_bonus_received ? '✅' : '⏳'}</div>
+                        <div><strong>${escapeHtml(ref.name || ref.email)}</strong><br>KYC: ${ref.verification_status}<br>Active: ${ref.kyc_bonus_received ? '✅' : '⏳'}</div>
                         <div>Commission earned: ₹${commissionFromRef}</div>
                     </div>
                 `;
@@ -302,20 +304,20 @@
             </div>
             <div class="stats-grid">
                 <div class="stat-card"><h4>Total Referrals</h4><div class="value">${userProfile.referral_count || 0}</div></div>
-                <div class="stat-card"><h4>Remaining Slots</h4><div class="value">${100 - (userProfile.referral_count || 0)}</div></div>
+                <div class="stat-card"><h4>Active Referrals</h4><div class="value">${activeReferrals}</div></div>
                 <div class="stat-card"><h4>Referral Bonus Earned</h4><div class="value">₹${userProfile.referral_earnings || 0}</div></div>
                 <div class="stat-card"><h4>10% Commission Earned</h4><div class="value">₹${totalCommission}</div></div>
             </div>
             <div style="background:#0f172a; border-radius:20px; padding:1rem; margin:1rem 0;">
                 <h3>📋 How It Works</h3>
-                <ul style="margin-left:1.5rem; line-height:1.8;">
+                <ul style="margin-left:1.5rem;">
                     <li>✅ Share your unique referral link.</li>
-                    <li>✅ When your friend completes KYC, <strong>you get ₹50</strong> and <strong>they get ₹50</strong>.</li>
+                    <li>✅ When your friend completes KYC, <strong>you get ₹50</strong> and <strong>they get ₹100</strong>.</li>
                     <li>✅ You also earn <strong>10% commission</strong> from every task reward your referred user earns.</li>
                     <li>✅ You can refer up to <strong>100 users</strong>.</li>
                 </ul>
             </div>
-            <h3>Your Referrals (${successfulReferrals} completed / ${pendingReferrals} pending)</h3>
+            <h3>Your Referrals (${activeReferrals} active / ${pendingReferrals} pending)</h3>
             <div>${referredListHtml || '<p>No referrals yet. Share your link!</p>'}</div>`;
         }
 
@@ -433,23 +435,60 @@
             }
         }
 
-        // ==================== WITHDRAWAL ====================
+        // ==================== WITHDRAWAL (deduct immediately, restore on reject in admin) ====================
         async function renderWithdraw() {
             const { data: methods } = await supabase.from('payment_methods').select('*').eq('uid',currentUser.id);
-            return `<h2>💸 Withdraw Funds</h2><div class="stats-grid"><div class="stat-card"><h4>Balance</h4><div class="value">₹${userProfile.balance||0}</div></div></div><h3>Payment Methods</h3><div>${methods?.map(m=>`<div class="payment-method-card"><span class="payment-badge">${m.type}</span> ${m.type==='UPI'?m.details:JSON.parse(m.details).name}<button class="btn-sm deleteMethod" data-id="${m.id}">Delete</button></div>`).join('')||'None'}</div><button id="addMethodBtn" class="btn-sm">+ Add Bank/UPI</button><h3>Request Withdrawal</h3><form id="wdForm"><select id="wdMethod">${methods?.map(m=>`<option value="${m.id}">${m.type} - ${m.details}</option>`).join('')}</select><input type="number" id="wdAmount" placeholder="Amount (Min ₹100)"><button type="submit">Withdraw</button></form>`;
+            return `<h2>💸 Withdraw Funds</h2><div class="stats-grid"><div class="stat-card"><h4>Balance</h4><div class="value">₹${userProfile.balance||0}</div></div></div>
+            <h3>Payment Methods</h3><div>${methods?.map(m=>`<div class="payment-method-card"><span class="payment-badge">${m.type}</span> ${m.type==='UPI'?m.details:JSON.parse(m.details).name}<button class="btn-sm deleteMethod" data-id="${m.id}">Delete</button></div>`).join('')||'None'}</div>
+            <button id="addMethodBtn" class="btn-sm">+ Add Bank/UPI</button>
+            <h3>Request Withdrawal</h3><form id="wdForm"><select id="wdMethod">${methods?.map(m=>`<option value="${m.id}">${m.type} - ${m.details}</option>`).join('')}</select><input type="number" id="wdAmount" placeholder="Amount (Min ₹100)"><button type="submit">Withdraw</button></form>`;
         }
-        async function addPaymentMethod() { toast("Method added","success"); renderPanel('withdraw'); }
+        async function addPaymentMethod() { /* same as before */ toast("Method added","success"); renderPanel('withdraw'); }
         async function deletePaymentMethod(id) { await supabase.from('payment_methods').delete().eq('id',id); renderPanel('withdraw'); }
-        async function requestWithdrawal(amount,methodId) { 
+        async function requestWithdrawal(amount, methodId) {
             if(userProfile.verification_status !== 'verified') return toast("Complete KYC first","error");
             if(amount<100) return toast("Min ₹100","error");
             if(amount>userProfile.balance) return toast("Insufficient balance","error");
             const { data: method } = await supabase.from('payment_methods').select('*').eq('id', methodId).single();
             let details = method.details;
             if(method.type === 'bank'){ const d=JSON.parse(details); details = `${d.name}, A/c:${d.account}, IFSC:${d.ifsc}`; }
-            await supabase.from('withdrawals').insert({ uid:currentUser.id, amount, method:method.type, details, status:'pending' });
-            toast("Withdrawal request sent!","success");
-            renderPanel('withdraw');
+            
+            // Immediately deduct balance
+            const newBalance = userProfile.balance - amount;
+            await supabase.from('profiles').update({ balance: newBalance }).eq('id', currentUser.id);
+            await supabase.from('balance_history').insert({ uid: currentUser.id, amount_change: -amount, new_balance: newBalance, reason: `Withdrawal request (pending)`, created_by: currentUser.id });
+            
+            const { error } = await supabase.from('withdrawals').insert({ uid: currentUser.id, amount, method:method.type, details, status:'pending' });
+            if(error) {
+                // rollback deduction if error
+                await supabase.from('profiles').update({ balance: userProfile.balance }).eq('id', currentUser.id);
+                toast(error.message, "error");
+            } else {
+                toast("Withdrawal request sent! Amount deducted from balance.", "success");
+                renderPanel('withdraw');
+            }
+        }
+
+        // ==================== TRANSACTION HISTORY ====================
+        async function renderTransactions() {
+            const { data: balanceHistory } = await supabase.from('balance_history').select('*').eq('uid', currentUser.id).order('created_at', { ascending: false }).limit(50);
+            const { data: withdrawals } = await supabase.from('withdrawals').select('*').eq('uid', currentUser.id).order('created_at', { ascending: false }).limit(50);
+            let html = `<h2>📊 Transaction History</h2>`;
+            html += `<h3>Balance Changes</h3><div class="tasks-container">`;
+            for(const entry of balanceHistory || []){
+                const sign = entry.amount_change >= 0 ? '+' : '';
+                const color = entry.amount_change >= 0 ? '#10b981' : '#ef4444';
+                html += `<div class="task-card" style="cursor:default;"><div><strong>${escapeHtml(entry.reason)}</strong><br>Amount: <span style="color:${color};">${sign}₹${entry.amount_change}</span><br>Balance: ₹${entry.new_balance}<br><small>${new Date(entry.created_at).toLocaleString()}</small></div></div>`;
+            }
+            if(!balanceHistory?.length) html += `<p>No balance changes yet.</p>`;
+            html += `</div><h3>Withdrawal Requests</h3><div class="tasks-container">`;
+            for(const w of withdrawals || []){
+                const statusColor = w.status === 'approved' ? '#10b981' : (w.status === 'pending' ? '#f59e0b' : '#ef4444');
+                html += `<div class="task-card" style="cursor:default;"><div><strong>Withdrawal ₹${w.amount}</strong><br>Method: ${w.method}<br>Details: ${escapeHtml(w.details)}<br>Status: <span style="color:${statusColor};">${w.status.toUpperCase()}</span><br><small>${new Date(w.created_at).toLocaleString()}</small></div></div>`;
+            }
+            if(!withdrawals?.length) html += `<p>No withdrawal requests yet.</p>`;
+            html += `</div>`;
+            return html;
         }
 
         // ==================== CHAT ====================
@@ -458,7 +497,7 @@
             return `<h2>💬 Support Chat</h2><div class="chat-box">${msgs?.map(m=>`<div><strong>${m.is_admin?'Admin':'You'}:</strong> ${escapeHtml(m.message)}</div>`).join('')||'No messages'}</div><div style="display:flex;"><input type="text" id="userChatMsg"><button id="sendMsgBtn">Send</button></div>`;
         }
 
-        // ==================== PANEL RENDERING ====================
+        // Panel rendering
         let currentTab = 'dashboard';
         async function renderPanel(tab) {
             const container = document.getElementById('dashboardMain');
@@ -468,6 +507,7 @@
             else if(tab === 'referrals') container.innerHTML = await renderReferrals();
             else if(tab === 'kyc') container.innerHTML = await renderKyc();
             else if(tab === 'withdraw') container.innerHTML = await renderWithdraw();
+            else if(tab === 'transactions') container.innerHTML = await renderTransactions();
             else if(tab === 'leaderboard') container.innerHTML = await renderLeaderboard();
             else if(tab === 'chat') container.innerHTML = await renderChat();
             attachCommonEvents();
@@ -491,7 +531,7 @@
         }
 
         function renderFullDashboard() {
-            return `<div class="dashboard-container"><div class="sidebar"><div class="logo">🎮 GAMELOOT</div><div class="nav-item active" data-tab="dashboard"><i class="fas fa-home"></i><span>Dashboard</span></div><div class="nav-item" data-tab="tasks"><i class="fas fa-tasks"></i><span>Earn Tasks</span></div><div class="nav-item" data-tab="submissions"><i class="fas fa-history"></i><span>My Submissions</span></div><div class="nav-item" data-tab="referrals"><i class="fas fa-user-plus"></i><span>Referrals</span></div><div class="nav-item" data-tab="kyc"><i class="fas fa-id-card"></i><span>KYC</span></div><div class="nav-item" data-tab="withdraw"><i class="fas fa-rupee-sign"></i><span>Withdraw</span></div><div class="nav-item" data-tab="leaderboard"><i class="fas fa-trophy"></i><span>Leaderboard</span></div><div class="nav-item" data-tab="chat"><i class="fas fa-headset"></i><span>Support</span></div><div class="nav-item" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></div></div><div class="main-panel" id="dashboardMain"></div></div><div class="bottom-nav"><div class="bottom-nav-item active" data-tab="dashboard"><i class="fas fa-home"></i><span>Home</span></div><div class="bottom-nav-item" data-tab="tasks"><i class="fas fa-tasks"></i><span>Tasks</span></div><div class="bottom-nav-item" data-tab="submissions"><i class="fas fa-history"></i><span>My Subs</span></div><div class="bottom-nav-item" data-tab="referrals"><i class="fas fa-user-plus"></i><span>Refer</span></div><div class="bottom-nav-item" data-tab="kyc"><i class="fas fa-id-card"></i><span>KYC</span></div><div class="bottom-nav-item" data-tab="withdraw"><i class="fas fa-rupee-sign"></i><span>Withdraw</span></div><div class="bottom-nav-item" data-tab="leaderboard"><i class="fas fa-trophy"></i><span>Top</span></div><div class="bottom-nav-item" data-tab="chat"><i class="fas fa-headset"></i><span>Chat</span></div></div>`;
+            return `<div class="dashboard-container"><div class="sidebar"><div class="logo">🎮 GAMELOOT</div><div class="nav-item active" data-tab="dashboard"><i class="fas fa-home"></i><span>Dashboard</span></div><div class="nav-item" data-tab="tasks"><i class="fas fa-tasks"></i><span>Earn Tasks</span></div><div class="nav-item" data-tab="submissions"><i class="fas fa-history"></i><span>My Submissions</span></div><div class="nav-item" data-tab="referrals"><i class="fas fa-user-plus"></i><span>Referrals</span></div><div class="nav-item" data-tab="kyc"><i class="fas fa-id-card"></i><span>KYC</span></div><div class="nav-item" data-tab="withdraw"><i class="fas fa-rupee-sign"></i><span>Withdraw</span></div><div class="nav-item" data-tab="transactions"><i class="fas fa-exchange-alt"></i><span>Transactions</span></div><div class="nav-item" data-tab="leaderboard"><i class="fas fa-trophy"></i><span>Leaderboard</span></div><div class="nav-item" data-tab="chat"><i class="fas fa-headset"></i><span>Support</span></div></div><div class="main-panel" id="dashboardMain"></div></div><div class="bottom-nav"><div class="bottom-nav-item active" data-tab="dashboard"><i class="fas fa-home"></i><span>Home</span></div><div class="bottom-nav-item" data-tab="tasks"><i class="fas fa-tasks"></i><span>Tasks</span></div><div class="bottom-nav-item" data-tab="submissions"><i class="fas fa-history"></i><span>My Subs</span></div><div class="bottom-nav-item" data-tab="referrals"><i class="fas fa-user-plus"></i><span>Refer</span></div><div class="bottom-nav-item" data-tab="kyc"><i class="fas fa-id-card"></i><span>KYC</span></div><div class="bottom-nav-item" data-tab="withdraw"><i class="fas fa-rupee-sign"></i><span>Withdraw</span></div><div class="bottom-nav-item" data-tab="transactions"><i class="fas fa-exchange-alt"></i><span>Trans</span></div><div class="bottom-nav-item" data-tab="leaderboard"><i class="fas fa-trophy"></i><span>Top</span></div><div class="bottom-nav-item" data-tab="chat"><i class="fas fa-headset"></i><span>Chat</span></div></div>`;
         }
 
         function initDashboard() {
@@ -501,11 +541,10 @@
             document.querySelectorAll('.nav-item[data-tab], .bottom-nav-item[data-tab]').forEach(el => {
                 el.addEventListener('click', () => { const tab = el.getAttribute('data-tab'); document.querySelectorAll('.nav-item, .bottom-nav-item').forEach(n=>n.classList.remove('active')); document.querySelectorAll(`.nav-item[data-tab="${tab}"], .bottom-nav-item[data-tab="${tab}"]`).forEach(n=>n.classList.add('active')); renderPanel(tab); });
             });
-            document.getElementById('logoutBtn')?.addEventListener('click', async () => { await supabase.auth.signOut(); location.reload(); });
         }
 
         function renderHeroPage() {
-            return `<div class="top-bar"><div class="logo">🎮 GAMELOOT</div><div class="auth-buttons"><button id="heroSignInBtn" class="btn-outline">Sign In</button><button id="heroSignUpBtn" class="btn-primary">Sign Up</button></div></div><div class="hero"><h1>Work Small, Earn Big</h1><p>Complete simple tasks, get rewarded instantly. Join thousands earning daily with GameLoot.</p><div class="hero-buttons"><button id="heroGetStarted" class="btn-primary">Get Started →</button><button id="heroLoginBtn" class="btn-outline">I already have an account</button></div><div class="feature-cards"><div class="feature-card"><i class="fas fa-tasks"></i><h3>Micro Tasks</h3><p>Earn ₹10–500 per task</p></div><div class="feature-card"><i class="fas fa-wallet"></i><h3>Fast Withdrawals</h3><p>UPI, Bank, Crypto</p></div><div class="feature-card"><i class="fas fa-users"></i><h3>Referral Bonuses</h3><p>₹50 + 10% commission</p></div></div></div>`;
+            return `<div class="top-bar"><div class="logo">🎮 GAMELOOT</div><div class="right-actions"><div class="notif-bell" style="display:none;"></div><button class="logout-btn" id="heroLogoutBtn">Logout</button></div></div><div class="hero"><h1>Work Small, Earn Big</h1><p>Complete simple tasks, get rewarded instantly. Join thousands earning daily with GameLoot.</p><div class="hero-buttons"><button id="heroGetStarted" class="btn-primary">Get Started →</button><button id="heroLoginBtn" class="btn-outline">I already have an account</button></div><div class="feature-cards"><div class="feature-card"><i class="fas fa-tasks"></i><h3>Micro Tasks</h3><p>Earn ₹10–500 per task</p></div><div class="feature-card"><i class="fas fa-wallet"></i><h3>Fast Withdrawals</h3><p>UPI, Bank, Crypto</p></div><div class="feature-card"><i class="fas fa-users"></i><h3>Referral Bonuses</h3><p>₹50 + 10% commission</p></div></div></div>`;
         }
 
         // Main auth
@@ -513,10 +552,9 @@
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
                 document.getElementById('root').innerHTML = renderHeroPage();
-                document.getElementById('heroSignUpBtn')?.addEventListener('click', showSignUpModal);
                 document.getElementById('heroGetStarted')?.addEventListener('click', showSignUpModal);
-                document.getElementById('heroSignInBtn')?.addEventListener('click', showSignInModal);
                 document.getElementById('heroLoginBtn')?.addEventListener('click', showSignInModal);
+                document.getElementById('heroLogoutBtn')?.addEventListener('click', async () => { await supabase.auth.signOut(); location.reload(); });
                 return;
             }
             currentUser = user;
@@ -531,15 +569,16 @@
                 if (ref && !userProfile.referred_by) { await supabase.from('profiles').update({ referred_by: ref }).eq('id', user.id); toast("Referral code applied!","success"); }
                 initDashboard();
                 const topBar = document.querySelector('.top-bar');
-                if(topBar && !topBar.querySelector('.notif-bell')) {
-                    const bell = document.createElement('div');
-                    bell.className = 'notif-bell';
-                    bell.innerHTML = '<i class="fas fa-bell"></i>';
-                    bell.addEventListener('click', showNotifications);
-                    topBar.querySelector('.auth-buttons')?.appendChild(bell);
-                    await fetchNotifications();
-                    updateNotifBell();
+                if(topBar && !topBar.querySelector('.right-actions')) {
+                    const rightDiv = document.createElement('div');
+                    rightDiv.className = 'right-actions';
+                    rightDiv.innerHTML = `<div class="notif-bell"><i class="fas fa-bell"></i></div><button id="topLogoutBtn" class="logout-btn">Logout</button>`;
+                    topBar.appendChild(rightDiv);
+                    document.querySelector('.notif-bell').addEventListener('click', showNotifications);
+                    document.getElementById('topLogoutBtn')?.addEventListener('click', async () => { await supabase.auth.signOut(); location.reload(); });
                 }
+                await fetchNotifications();
+                updateNotifBell();
             } catch(err) {
                 document.getElementById('root').innerHTML = `<div class="hero"><h2>Error</h2><p>${err.message}</p><button class="btn-primary" onclick="location.reload()">Retry</button></div>`;
                 console.error(err);
